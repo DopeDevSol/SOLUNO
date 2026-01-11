@@ -1,0 +1,8 @@
+{
+  "name": "SOLUNO Royale",
+  "description": "The premier high-stakes blockchain card game on Solana. Verify holdings to join pools and win the pot in SOLUNO.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
