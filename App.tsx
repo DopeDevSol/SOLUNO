@@ -1,93 +1,27 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { POOLS, HOUSE_FEE_PERCENT } from './constants';
-import { Card, GameState, Player, Pool, CardColor, LeaderboardEntry } from './types';
+import { Card, GameState, Player, Pool, CardColor } from './types';
 import UnoCard from './components/UnoCard';
+import { getGameCommentary } from './services/geminiService';
 
-const MOCK_LEADERBOARD: LeaderboardEntry[] = [
-  { rank: 1, address: "7vM8...xP2q", wins: 142, totalWon: 45.5 },
-  { rank: 2, address: "G3nK...pL9s", wins: 128, totalWon: 38.2 },
-  { rank: 3, address: "Bn2M...wQ4r", wins: 115, totalWon: 31.0 },
-  { rank: 4, address: "X9zP...mK5t", wins: 98, totalWon: 22.4 },
-];
-
-const POOL_THEMES: Record<number, { glow: string, accent: string }> = {
-  1: { glow: 'shadow-[0_0_30px_rgba(59,130,246,0.1)]', accent: 'text-blue-400' },
-  2: { glow: 'shadow-[0_0_30px_rgba(16,185,129,0.1)]', accent: 'text-emerald-400' },
-  3: { glow: 'shadow-[0_0_30px_rgba(139,92,246,0.1)]', accent: 'text-purple-400' },
-  4: { glow: 'shadow-[0_0_30px_rgba(249,115,22,0.1)]', accent: 'text-orange-400' },
-  5: { glow: 'shadow-[0_0_30px_rgba(239,68,68,0.1)]', accent: 'text-red-400' },
-};
-
-const SolanaLogoSVG: React.FC<{ className?: string }> = ({ className }) => (
-  <svg viewBox="0 0 387 310" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M60.1 76.5H387L326.9 0H0L60.1 76.5Z" fill="white"/>
-    <path d="M326.9 233.5H0L60.1 310H387L326.9 233.5Z" fill="white"/>
-    <path d="M326.9 116.5H0L60.1 193H387L326.9 116.5Z" fill="white"/>
-  </svg>
-);
-
-const ConfettiBurst: React.FC = () => {
-  const pieces = useMemo(() => Array.from({ length: 80 }), []);
-  const colors = ['#9945FF', '#14F195', '#ed1c24', '#0054a6', '#fcee21', '#ffffff'];
-  
-  return (
-    <div className="fixed inset-0 pointer-events-none z-[150] overflow-hidden">
-      {pieces.map((_, i) => (
-        <div
-          key={i}
-          className="confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            backgroundColor: colors[Math.floor(Math.random() * colors.length)],
-            animationDelay: `${Math.random() * 4}s`,
-            animationDuration: `${2.5 + Math.random() * 3}s`,
-            width: `${8 + Math.random() * 12}px`,
-            height: `${8 + Math.random() * 12}px`,
-            borderRadius: Math.random() > 0.5 ? '50%' : '0%',
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
-const DirectionIndicator: React.FC<{ direction: 1 | -1 }> = ({ direction }) => (
-  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-    <div className="w-64 h-64 lg:w-[50rem] lg:h-[50rem] border-4 lg:border-8 border-dashed border-white/5 rounded-full flex items-center justify-center opacity-30" style={{ animation: `spin ${direction === 1 ? '30s' : '30s reverse'} linear infinite` }}>
-      <svg className="w-32 h-32 lg:w-[30rem] lg:h-[30rem] fill-white/5" viewBox="0 0 24 24">
-        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
-      </svg>
-    </div>
-  </div>
-);
-
-const SolunoLogo: React.FC<{ size?: 'sm' | 'lg' }> = ({ size = 'lg' }) => (
-  <div className={`flex items-center gap-2 ${size === 'lg' ? 'mb-8' : ''}`}>
-    <div className="w-8 h-8 lg:w-20 lg:h-20 bg-white rounded-lg lg:rounded-2xl rotate-12 flex items-center justify-center font-black text-black italic text-lg lg:text-4xl shadow-2xl">S</div>
-    <h1 className={`${size === 'lg' ? 'text-4xl lg:text-7xl' : 'text-xl lg:text-2xl'} text-white font-black italic tracking-tighter drop-shadow-lg`}>SOLUNO</h1>
-  </div>
-);
+const MAX_TURN_TIME = 15;
 
 const App: React.FC = () => {
-  const [address, setAddress] = useState<string | null>(null);
-  const [view, setView] = useState<'lobby' | 'game' | 'leaderboard'>('lobby');
   const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [view, setView] = useState<'lobby' | 'game' | 'leaderboard'>('lobby');
   const [activeSpecialId, setActiveSpecialId] = useState<string | null>(null);
   const [dealingCardTarget, setDealingCardTarget] = useState<{ x: number, y: number } | null>(null);
-
-  const [poolStates, setPoolStates] = useState<Record<number, { players: number, countdown: number, round: number }>>({
-    1: { players: 1, countdown: 15, round: 1242 },
-    2: { players: 10, countdown: 0, round: 856 },
-    3: { players: 2, countdown: 210, round: 431 },
-    4: { players: 5, countdown: 350, round: 219 },
-    5: { players: 9, countdown: 12, round: 94 },
-  });
+  const [commentary, setCommentary] = useState("High stakes, low latency...");
+  const [turnTimeLeft, setTurnTimeLeft] = useState(MAX_TURN_TIME);
 
   const [gameState, setGameState] = useState<GameState>({
     deck: [], discardPile: [], players: [], currentPlayerIndex: 0, direction: 1,
     isGameOver: false, winner: null, status: 'lobby', pool: null, lobbyCountdown: 300
   });
+
+  // Fix: Replaced NodeJS.Timeout with ReturnType<typeof setInterval> to avoid namespace errors in browser-only environments where NodeJS types aren't explicitly available.
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const winningPrize = useMemo(() => {
     if (!gameState.pool) return 0;
@@ -95,22 +29,23 @@ const App: React.FC = () => {
     return totalPot * (1 - HOUSE_FEE_PERCENT);
   }, [gameState.pool, gameState.players.length]);
 
-  // Organizing hand: Numbers by color first, then Actions (grouped), then Wilds on far right
   const sortedHand = useMemo(() => {
-    if (!gameState.players[0]) return [];
+    const localPlayer = gameState.players.find(p => p.isLocal);
+    if (!localPlayer) return [];
+    
     const colorOrder = { red: 0, blue: 1, green: 2, yellow: 3, wild: 4 };
     const valueOrder = {
       '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
       'skip': 10, 'reverse': 11, 'draw2': 12, 'wild': 13, 'draw4': 14
     };
 
-    return [...gameState.players[0].hand].sort((a, b) => {
+    return [...localPlayer.hand].sort((a, b) => {
       if (colorOrder[a.color] !== colorOrder[b.color]) {
         return colorOrder[a.color] - colorOrder[b.color];
       }
       return valueOrder[a.value] - valueOrder[b.value];
     });
-  }, [gameState.players[0]?.hand]);
+  }, [gameState.players]);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -118,33 +53,75 @@ const App: React.FC = () => {
         const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT');
         const data = await res.json();
         setSolPrice(parseFloat(data.price));
-      } catch (e) {
-        setSolPrice(138.42);
-      }
+      } catch (e) { setSolPrice(148.92); }
     };
     fetchPrice();
-    const priceInterval = setInterval(fetchPrice, 30000);
+    const interval = setInterval(fetchPrice, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const occupancyInterval = setInterval(() => {
-      setPoolStates(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(id => {
-          const poolId = Number(id);
-          if (Math.random() > 0.9 && next[poolId].players < 10) {
-            next[poolId].players++;
-          } else if (Math.random() > 0.98 && next[poolId].players > 1) {
-            next[poolId].players--;
-          }
-        });
-        return next;
+  // Turn Timer Countdown
+  useEffect(() => {
+    if (gameState.status !== 'playing' || gameState.isGameOver) return;
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    
+    setTurnTimeLeft(MAX_TURN_TIME);
+
+    timerRef.current = setInterval(() => {
+      setTurnTimeLeft(prev => {
+        if (prev <= 1) {
+          handleTimeout();
+          return MAX_TURN_TIME;
+        }
+        return prev - 1;
       });
-    }, 5000);
+    }, 1000);
 
     return () => {
-      clearInterval(priceInterval);
-      clearInterval(occupancyInterval);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver]);
+
+  // Fix: Added useEffect to fetch fresh AI commentary when the turn changes or the game state evolves.
+  useEffect(() => {
+    if (gameState.status === 'playing' && !gameState.isGameOver) {
+      const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+      const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+      const summary = `Player ${currentPlayer?.name} is making a move. Top card is ${topCard?.color} ${topCard?.value}. Player has ${currentPlayer?.hand.length} cards left.`;
+      getGameCommentary(summary).then(setCommentary);
+    }
+  }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver]);
+
+  const handleTimeout = useCallback(() => {
+    console.log("Turn Timeout!");
+    drawFromDeck();
+  }, [gameState.currentPlayerIndex]);
+
+  // Bot Logic
+  useEffect(() => {
+    if (gameState.status === 'playing' && gameState.currentPlayerIndex !== 0 && !gameState.isGameOver) {
+      const botDelay = 2000 + Math.random() * 2000;
+      const timeout = setTimeout(() => {
+        performBotMove();
+      }, botDelay);
+      return () => clearTimeout(timeout);
+    }
+  }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver]);
+
+  const performBotMove = () => {
+    const bot = gameState.players[gameState.currentPlayerIndex];
+    if (!bot) return;
+
+    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+    const validCard = bot.hand.find(c => c.color === 'wild' || c.color === topCard.color || c.value === topCard.value);
+
+    if (validCard) {
+      playCardInternal(validCard, gameState.currentPlayerIndex);
+    } else {
+      drawFromDeckInternal(gameState.currentPlayerIndex);
+    }
+  };
 
   const createDeck = useCallback((): Card[] => {
     const colors: CardColor[] = ['red', 'blue', 'green', 'yellow'];
@@ -173,422 +150,258 @@ const App: React.FC = () => {
     const newState = { ...state };
     const newPlayers = [...newState.players];
     const newDeck = [...newState.deck];
-    
     for (let i = 0; i < count; i++) {
       if (newDeck.length === 0) {
-        const topCard = newState.discardPile.pop()!;
-        const reshuffled = newState.discardPile.sort(() => Math.random() - 0.5);
-        newDeck.push(...reshuffled);
-        newState.discardPile = [topCard];
+        const top = newState.discardPile.pop()!;
+        newDeck.push(...newState.discardPile.sort(() => Math.random() - 0.5));
+        newState.discardPile = [top];
       }
       const card = newDeck.pop();
       if (card) newPlayers[playerIdx].hand.push(card);
     }
-    
     newState.players = newPlayers;
     newState.deck = newDeck;
     return newState;
   };
 
-  const playCard = (card: Card) => {
-    if (gameState.currentPlayerIndex !== 0 || gameState.status !== 'playing') return;
+  const playCardInternal = (card: Card, playerIdx: number) => {
     const topCard = gameState.discardPile[gameState.discardPile.length - 1];
     const isValid = card.color === 'wild' || card.color === topCard.color || card.value === topCard.value;
     if (!isValid) return;
 
     let newState = { ...gameState };
-    const currentPlayer = newState.players[0];
-    currentPlayer.hand = currentPlayer.hand.filter(c => c.id !== card.id);
+    newState.players[playerIdx].hand = newState.players[playerIdx].hand.filter(c => c.id !== card.id);
     newState.discardPile.push(card);
     setActiveSpecialId(card.id);
 
-    if (currentPlayer.hand.length === 0) {
-      newState.isGameOver = true;
-      newState.winner = 'YOU';
-      newState.status = 'ended';
-      setGameState(newState);
+    if (newState.players[playerIdx].hand.length === 0) {
+      setGameState({ ...newState, isGameOver: true, winner: newState.players[playerIdx].name, status: 'ended' });
       return;
     }
 
     let skip = false;
     if (card.value === 'skip') skip = true;
     if (card.value === 'reverse') newState.direction *= -1;
-    if (card.value === 'draw2') {
-      newState = drawCards(newState, nextPlayer(newState), 2);
-      skip = true;
-    }
-    if (card.value === 'draw4') {
-      newState = drawCards(newState, nextPlayer(newState), 4);
-      skip = true;
-      card.color = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)] as CardColor;
-    }
-    if (card.value === 'wild') {
-       card.color = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)] as CardColor;
-    }
+    if (card.value === 'draw2') { newState = drawCards(newState, nextPlayer(newState), 2); skip = true; }
+    if (card.value === 'draw4') { newState = drawCards(newState, nextPlayer(newState), 4); skip = true; card.color = 'red'; }
+    if (card.value === 'wild') card.color = 'blue';
 
     newState.currentPlayerIndex = nextPlayer(newState, skip);
     setGameState(newState);
-    setTimeout(() => setActiveSpecialId(null), 1000);
+    setTimeout(() => setActiveSpecialId(null), 1200);
   };
 
-  const drawFromDeck = () => {
-    if (gameState.currentPlayerIndex !== 0 || gameState.status !== 'playing') return;
-    let newState = drawCards(gameState, 0, 1);
+  const drawFromDeckInternal = (playerIdx: number) => {
+    let newState = drawCards(gameState, playerIdx, 1);
     newState.currentPlayerIndex = nextPlayer(newState);
     setGameState(newState);
   };
 
-  const handleLeaveGame = () => {
-    if (window.confirm("WARNING: If you leave now, you will lose your bet amount and the round will count as a loss. Are you sure?")) {
-      setView('lobby');
-    }
+  const playCard = (card: Card) => {
+    if (gameState.currentPlayerIndex !== 0 || gameState.status !== 'playing') return;
+    playCardInternal(card, 0);
   };
 
-  useEffect(() => {
-    if (gameState.status === 'playing' && gameState.currentPlayerIndex !== 0 && !gameState.isGameOver) {
-      const timer = setTimeout(() => {
-        const botIdx = gameState.currentPlayerIndex;
-        const bot = gameState.players[botIdx];
-        const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-        const playableCard = bot.hand.find(c => c.color === 'wild' || c.color === topCard.color || c.value === topCard.value);
-
-        if (playableCard) {
-          let newState = { ...gameState };
-          const botRef = newState.players[botIdx];
-          botRef.hand = botRef.hand.filter(c => c.id !== playableCard.id);
-          newState.discardPile.push(playableCard);
-          setActiveSpecialId(playableCard.id);
-
-          if (botRef.hand.length === 0) {
-            newState.isGameOver = true;
-            newState.winner = botRef.name;
-            newState.status = 'ended';
-            setGameState(newState);
-            return;
-          }
-
-          let skip = false;
-          if (playableCard.value === 'skip') skip = true;
-          if (playableCard.value === 'reverse') newState.direction *= -1;
-          if (playableCard.value === 'draw2') {
-            newState = drawCards(newState, nextPlayer(newState), 2);
-            skip = true;
-          }
-          if (playableCard.value === 'draw4') {
-            newState = drawCards(newState, nextPlayer(newState), 4);
-            skip = true;
-            playableCard.color = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)] as CardColor;
-          }
-          if (playableCard.value === 'wild') {
-            playableCard.color = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random() * 4)] as CardColor;
-          }
-
-          newState.currentPlayerIndex = nextPlayer(newState, skip);
-          setGameState(newState);
-          setTimeout(() => setActiveSpecialId(null), 800);
-        } else {
-          let newState = drawCards(gameState, botIdx, 1);
-          newState.currentPlayerIndex = nextPlayer(newState);
-          setGameState(newState);
-        }
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver]);
+  const drawFromDeck = () => {
+    if (gameState.status !== 'playing') return;
+    drawFromDeckInternal(gameState.currentPlayerIndex);
+  };
 
   const startDealingAnimation = async () => {
     const deck = createDeck();
-    const CARDS_PER_PLAYER = 7;
-    for (let round = 0; round < CARDS_PER_PLAYER; round++) {
+    setGameState(prev => ({ ...prev, deck }));
+    for (let round = 0; round < 7; round++) {
       for (let pIdx = 0; pIdx < 10; pIdx++) {
-        const angleOffset = 90;
-        const step = 360 / 10;
-        const angle = angleOffset + (pIdx * step);
-        const tx = 35 * Math.cos((angle * Math.PI) / 180);
-        const ty = 25 * Math.sin((angle * Math.PI) / 180);
-        setDealingCardTarget({ x: tx, y: ty });
-        await new Promise(r => setTimeout(r, 80));
+        const angle = 90 + (pIdx * 36);
+        setDealingCardTarget({ x: 42 * Math.cos((angle * Math.PI) / 180), y: 32 * Math.sin((angle * Math.PI) / 180) });
+        await new Promise(r => setTimeout(r, 40));
         setGameState(prev => {
-          const newPlayers = [...prev.players];
-          const newDeck = [...prev.deck.length ? prev.deck : deck];
+          const players = [...prev.players];
+          const newDeck = [...prev.deck];
           const card = newDeck.pop();
-          if (card && newPlayers[pIdx]) newPlayers[pIdx].hand.push(card);
-          return { ...prev, players: newPlayers, deck: newDeck };
+          if (card && players[pIdx]) players[pIdx].hand.push(card);
+          return { ...prev, players, deck: newDeck };
         });
       }
     }
     setDealingCardTarget(null);
     setGameState(prev => {
       const newDeck = [...prev.deck];
-      let firstCard = newDeck.pop()!;
-      while(firstCard.color === 'wild' || firstCard.value === 'draw4') { newDeck.unshift(firstCard); firstCard = newDeck.pop()!; }
-      return { ...prev, status: 'playing', discardPile: [firstCard], deck: newDeck };
+      let top = newDeck.pop()!;
+      while(top.color === 'wild' || top.value === 'draw4') { newDeck.unshift(top); top = newDeck.pop()!; }
+      return { ...prev, status: 'playing', discardPile: [top], deck: newDeck };
     });
   };
 
-  // Fixed the missing 'enterPool' error by implementing the function
   const enterPool = (pool: Pool) => {
-    const localPlayer: Player = {
-      id: 'local-1',
-      name: 'YOU',
-      hand: [],
-      isLocal: true,
-      avatarSeed: Math.floor(Math.random() * 1000),
-    };
-
-    const bots: Player[] = Array.from({ length: 9 }).map((_, i) => ({
-      id: `bot-${i}`,
-      name: `WHALE #${i + 1}`,
-      hand: [],
-      isLocal: false,
-      avatarSeed: Math.floor(Math.random() * 1000),
-    }));
-
-    setGameState({
-      deck: [],
-      discardPile: [],
-      players: [localPlayer, ...bots],
-      currentPlayerIndex: 0,
-      direction: 1,
-      isGameOver: false,
-      winner: null,
-      status: 'shuffling',
-      pool,
-      lobbyCountdown: 0
-    });
-    
+    const players: Player[] = [
+      { id: 'me', name: 'YOU', hand: [], isLocal: true, avatarSeed: 88 },
+      ...Array.from({ length: 9 }).map((_, i) => ({ id: `b-${i}`, name: `BOT ${i+1}`, hand: [], isLocal: false, avatarSeed: Math.random() * 1000 }))
+    ];
+    setGameState({ deck: [], discardPile: [], players, currentPlayerIndex: 0, direction: 1, isGameOver: false, winner: null, status: 'shuffling', pool, lobbyCountdown: 0 });
     setView('game');
-
-    // Slight delay to allow the 'shuffling' UI to be visible before dealing starts
-    setTimeout(() => {
-      startDealingAnimation();
-    }, 2000);
+    setTimeout(() => startDealingAnimation(), 1200);
   };
 
-  const PlayerSlot: React.FC<{ player: Player; index: number; total: number; active: boolean }> = ({ player, index, total, active }) => {
-    if (index === 0) return null; 
-    const isMobile = window.innerWidth < 768;
-    const angleOffset = 90;
-    const step = 360 / total;
-    const angle = angleOffset + (index * step);
-    const radiusX = isMobile ? 42 : 46; 
-    const radiusY = isMobile ? 32 : 36;
-    const x = 50 + radiusX * Math.cos((angle * Math.PI) / 180);
-    const y = 35 + radiusY * Math.sin((angle * Math.PI) / 180); // Seat positions shifted high
+  const PlayerSlot: React.FC<{ player: Player; index: number; active: boolean }> = ({ player, index, active }) => {
+    if (index === 0) return null;
+    const angle = 180 - ((index - 1) * (180 / 8)); 
+    const x = 50 + 46 * Math.cos((angle * Math.PI) / 180);
+    const y = 42 - 34 * Math.sin((angle * Math.PI) / 180);
     
     return (
-      <div className={`absolute flex flex-col items-center transition-all duration-500 ${active ? 'z-[60] scale-105 lg:scale-125' : 'z-20 opacity-40 scale-[0.5] lg:scale-90 grayscale'}`} style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}>
-        <div className={`w-7 h-7 lg:w-20 lg:h-20 rounded-full border lg:border-4 overflow-hidden mb-1 shadow-[0_0_10px_rgba(0,0,0,0.5)] ${active ? 'border-purple-500 bg-purple-500/30' : 'border-white/10 bg-black'}`}>
-          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${player.avatarSeed}`} alt={player.name} className="w-full h-full object-cover" />
+      <div className={`absolute flex flex-col items-center transition-all duration-700 ${active ? 'z-50 scale-125' : 'z-20 opacity-50 scale-90'}`} style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}>
+        <div className={`w-10 h-10 rounded-full border-2 overflow-hidden shadow-2xl transition-all duration-300 ${active ? 'border-[#14F195] bg-[#14F195]/20 shadow-[0_0_25px_#14F195]' : 'border-white/10 bg-black/40'}`}>
+          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${player.avatarSeed}`} alt="av" className="w-full h-full" />
         </div>
-        <div className={`px-1 py-0.25 lg:px-4 lg:py-1 rounded-full text-[6px] lg:text-xs font-black transition-all ${active ? 'bg-purple-600 text-white' : 'bg-black/80 text-white/50 border border-white/5'}`}>
-          <span className="hidden lg:inline">{player.name}</span> <span className="bg-white/20 px-1 lg:ml-1 rounded-sm lg:rounded-md">{player.hand.length}</span>
+        <div className={`mt-2 px-2 py-0.5 rounded text-[8px] font-black tracking-tighter ${active ? 'bg-[#14F195] text-black' : 'bg-black/80 text-white/50'}`}>
+          {player.name} • {player.hand.length}
         </div>
+        {active && (
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[7px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+            {turnTimeLeft}
+          </div>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col font-sans uppercase select-none overflow-hidden relative">
-      <nav className="flex-none border-b border-white/10 p-2 lg:p-6 flex justify-between items-center bg-black/80 backdrop-blur-xl z-[100]">
-        <SolunoLogo size="sm" />
-        <div className="flex gap-2 lg:gap-6 items-center">
-          <button onClick={() => setView('leaderboard')} className="px-2 lg:px-5 py-2 hover:bg-white/10 rounded-full text-[9px] lg:text-sm font-black transition-all text-white/70 tracking-tighter lg:tracking-widest border border-transparent">STATS</button>
-          {!address ? (
-            <button onClick={() => setAddress("DEMO")} className="bg-white text-black px-3 lg:px-10 py-2 lg:py-3 rounded-lg lg:rounded-xl font-black text-[9px] lg:text-sm hover:scale-105 active:scale-95 transition-all shadow-xl">CONNECT</button>
-          ) : (
-            <div className="flex items-center gap-2 lg:gap-3 bg-white/5 border border-white/10 px-3 lg:px-6 py-2 lg:py-3 rounded-lg lg:rounded-xl font-mono text-[10px] lg:text-sm">
-              <span className="text-emerald-400 font-black tracking-tighter">8.8 SOL</span>
-            </div>
-          )}
+    <div className="h-[100dvh] flex flex-col felt-table overflow-hidden">
+      <nav className="flex-none px-4 py-2 flex justify-between items-center bg-black/80 backdrop-blur-3xl z-[150] border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-gradient-to-br from-[#9945FF] to-[#14F195] rounded flex items-center justify-center text-white font-black text-[10px]">S</div>
+          <h1 className="text-[10px] font-black italic text-white/80 tracking-tighter">SOLUNO ROYALE</h1>
+        </div>
+        <div className="flex gap-4 items-center">
+          <span className="text-[9px] font-black text-[#14F195] italic">SOL: ${solPrice?.toFixed(2)}</span>
+          <div className="bg-[#14F195]/10 px-2 py-0.5 rounded text-[9px] font-mono text-[#14F195]">8.80 SOL</div>
         </div>
       </nav>
 
-      <main className="flex-1 relative overflow-hidden z-10 custom-scrollbar">
+      <main className="flex-1 relative overflow-hidden">
         {view === 'lobby' && (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 lg:p-8 overflow-y-auto">
-            <SolunoLogo />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-8 max-w-[90rem] w-full">
-              {POOLS.map(p => {
-                const occupancy = poolStates[p.id].players;
-                const isFull = occupancy >= 10;
-                return (
-                  <button key={p.id} onClick={() => enterPool(p)} className={`group relative bg-black/60 backdrop-blur-md border border-white/10 p-6 lg:p-12 rounded-3xl lg:rounded-[2.5rem] transition-all duration-500 flex flex-col items-center overflow-hidden hover:border-white/40 lg:hover:-translate-y-4 ${POOL_THEMES[p.id].glow}`}>
-                    <div className="absolute top-2 right-4 lg:top-4 lg:right-8 text-[8px] lg:text-[11px] font-black text-white/20 tracking-tighter">ROUND #{poolStates[p.id].round}</div>
-                    <div className={`text-4xl lg:text-7xl font-black italic tracking-tighter mb-1 lg:mb-2 ${POOL_THEMES[p.id].accent}`}>{p.entryFee}<span className="text-sm lg:text-lg opacity-30 ml-1 lg:ml-2">SOL</span></div>
-                    
-                    <div className="w-full flex flex-col items-center gap-1 lg:gap-3 my-2 lg:my-6">
-                       <div className="flex justify-between w-full text-[8px] lg:text-[10px] font-black tracking-widest text-white/50">
-                          <span>{occupancy}/10 PLAYERS</span>
-                       </div>
-                       <div className="w-full h-1.5 lg:h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                          <div className={`h-full transition-all duration-1000 ${isFull ? 'bg-red-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.7)]'}`} style={{ width: `${occupancy * 10}%` }}></div>
-                       </div>
-                    </div>
-
-                    <div className="w-full py-2 lg:py-4 bg-white text-black rounded-xl lg:rounded-2xl text-[10px] lg:text-sm font-black uppercase shadow-2xl group-hover:bg-emerald-400 group-hover:scale-105 transition-all">JOIN</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {view === 'leaderboard' && (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 lg:p-8 overflow-y-auto">
-             <div className="max-w-5xl w-full text-center">
-                <h2 className="text-4xl lg:text-[10rem] font-black italic tracking-tighter text-white uppercase mb-4 lg:mb-20 drop-shadow-[0_0_20px_rgba(255,255,255,0.2)] leading-none text-wrap break-words">THE WHALE LIST</h2>
-                <div className="bg-black/80 border border-white/10 rounded-3xl lg:rounded-[3rem] overflow-hidden backdrop-blur-3xl shadow-[0_0_100px_rgba(0,0,0,0.8)]">
-                   {MOCK_LEADERBOARD.map(entry => (
-                      <div key={entry.rank} className="grid grid-cols-4 p-4 lg:p-10 items-center border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                         <span className="w-8 h-8 lg:w-16 lg:h-16 flex items-center justify-center rounded-lg lg:rounded-2xl bg-white/10 text-sm lg:text-3xl font-black text-white">{entry.rank}</span>
-                         <span className="font-mono text-[9px] lg:text-lg text-white/40 tracking-wider truncate px-2">{entry.address}</span>
-                         <span className="text-center font-black italic text-emerald-400 text-[9px] lg:text-2xl uppercase">{entry.wins} W</span>
-                         <span className="text-right font-black italic text-sm lg:text-4xl tracking-tighter text-white">{entry.totalWon} SOL</span>
-                      </div>
-                   ))}
-                </div>
-                <button onClick={() => setView('lobby')} className="mt-8 lg:mt-20 px-12 lg:px-24 py-3 lg:py-6 bg-white text-black rounded-xl lg:rounded-2xl font-black text-xs lg:text-lg hover:scale-110 active:scale-95 transition-all shadow-2xl uppercase">BACK</button>
+          <div className="h-full flex flex-col items-center justify-center gap-6 p-4">
+             <div className="text-center">
+                <h2 className="text-5xl lg:text-8xl font-black italic tracking-tighter text-white drop-shadow-2xl">SOLUNO TABLES</h2>
+                <p className="text-[#14F195] text-[10px] font-black tracking-[0.8em] mt-3">HIGH STAKES TOURNAMENT</p>
              </div>
+             <div className="grid grid-cols-5 gap-4 max-w-5xl w-full px-6">
+              {POOLS.map(p => (
+                <button key={p.id} onClick={() => enterPool(p)} className="bg-black/90 border border-white/10 p-6 rounded-[2rem] flex flex-col items-center hover:border-[#14F195] hover:scale-105 transition-all group active:scale-95 shadow-2xl">
+                  <span className="text-4xl font-black text-[#14F195] italic leading-none">{p.entryFee}</span>
+                  <span className="text-[8px] text-white/40 mt-2 uppercase tracking-widest font-bold">SOL BUY-IN</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         {view === 'game' && (
-          <div className="h-full flex flex-col relative felt-table overflow-hidden">
-            <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-              
-              <SolanaLogoSVG className="solana-watermark left-[2%] top-[5%] scale-50 lg:scale-75" />
-              <SolanaLogoSVG className="solana-watermark right-[2%] top-[5%] scale-50 lg:scale-75" />
+          <div className="w-full h-full relative">
+            <div className={`direction-ring ${gameState.direction === 1 ? 'spin-cw' : 'spin-ccw'}`} />
+            
+            <div className="table-watermark-center">
+               <div className="watermark-text">SOLUNO</div>
+               <div className="watermark-text mt-2" style={{ fontSize: '1.5vh' }}>TABLE PRO #8831</div>
+            </div>
 
-              <DirectionIndicator direction={gameState.direction} />
-              
-              <div className="neon-circle-container flex items-center justify-center scale-50 sm:scale-75 lg:scale-110 mt-[-15dvh]">
-                 <div className={`neon-circle ${gameState.direction === 1 ? 'animate-cw' : 'animate-ccw'}`}></div>
+            <div className="absolute top-[5%] right-[2%] z-[60]">
+               <div className="bg-black/95 backdrop-blur-2xl border border-white/10 px-4 py-2 rounded-xl max-w-[200px] shadow-2xl">
+                  <p className="text-[10px] font-bold text-[#14F195] leading-tight italic">"{commentary}"</p>
+               </div>
+            </div>
+
+            <div className="absolute inset-0 z-10">
+              {gameState.players.map((p, i) => <PlayerSlot key={p.id} player={p} index={i} active={gameState.currentPlayerIndex === i} />)}
+            </div>
+
+            <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-16 lg:gap-32 z-30 scale-[0.7] lg:scale-100">
+               <div className="flex flex-col items-center gap-3 group" onClick={drawFromDeck}>
+                  <div className="relative">
+                     <div className="absolute stack-2"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
+                     <div className="absolute stack-1"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
+                     <div className="relative transform group-active:translate-y-1 transition-transform">
+                        <UnoCard card={{} as any} isBack size="lg" disabled={gameState.currentPlayerIndex !== 0} />
+                     </div>
+                  </div>
+                  <span className="text-[9px] font-black text-white/30 tracking-[0.4em]">DECK</span>
+               </div>
+
+               <div className="flex flex-col items-center gap-3">
+                  <div className="relative w-24 h-36 flex items-center justify-center">
+                    {/* Timer Ring around Discard Pile */}
+                    <svg className="absolute w-[140%] h-[140%] rotate-[-90deg] pointer-events-none opacity-40">
+                      <circle cx="50%" cy="50%" r="48%" stroke={turnTimeLeft < 5 ? '#ef4444' : '#14F195'} strokeWidth="4" fill="transparent" strokeDasharray="300" strokeDashoffset={300 - (300 * (turnTimeLeft / MAX_TURN_TIME))} className="transition-all duration-1000" />
+                    </svg>
+
+                    {gameState.discardPile.length > 1 && (
+                      <div className="absolute opacity-20 rotate-[-12deg] translate-x-1 translate-y-1">
+                         <UnoCard card={gameState.discardPile[gameState.discardPile.length - 2]} size="lg" disabled />
+                      </div>
+                    )}
+                    {gameState.discardPile.slice(-1).map(c => <UnoCard key={c.id} card={c} size="lg" isSpecialEffect={c.id === activeSpecialId} />)}
+                  </div>
+                  <span className="text-[9px] font-black text-[#14F195] tracking-[0.4em]">PILE</span>
+               </div>
+            </div>
+
+            <div className="absolute top-[12%] left-1/2 -translate-x-1/2 z-[40] bg-black/90 border border-[#14F195]/20 px-6 py-2 rounded-full shadow-2xl flex items-center gap-3">
+               <div className="w-2 h-2 bg-[#14F195] rounded-full animate-pulse"></div>
+               <span className="text-xl font-black italic text-[#14F195] leading-none tracking-tighter">{winningPrize.toFixed(2)} SOL POT</span>
+            </div>
+
+            {dealingCardTarget && <div className="dealing-card-anim" style={{ '--tx': `${dealingCardTarget.x}vw`, '--ty': `${dealingCardTarget.y}vh` } as any}><div className="w-8 h-12 bg-[#111] border border-white/20 rounded-md"></div></div>}
+
+            <div className="absolute bottom-[-10px] w-full z-[200] flex flex-col items-center hand-tray-bg pt-4 pb-6 overflow-visible">
+              <div className="flex justify-between items-center w-full px-12 mb-3 pointer-events-none">
+                <button onClick={() => setView('lobby')} className="pointer-events-auto bg-white/5 border border-white/10 px-4 py-1.5 rounded-full text-[8px] font-black text-white/40 hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-widest">EXIT</button>
+                <div className={`pointer-events-auto px-10 py-2 rounded-full text-[11px] font-black italic border-2 transition-all flex items-center gap-4 ${gameState.currentPlayerIndex === 0 ? 'bg-[#14F195] border-[#14F195] text-black shadow-[0_0_40px_rgba(20,241,149,0.3)]' : 'bg-black/80 border-white/10 text-white/30'}`}>
+                  <span>{gameState.currentPlayerIndex === 0 ? "★ YOUR TURN ★" : `WAITING FOR ${gameState.players[gameState.currentPlayerIndex]?.name}...`}</span>
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center border border-current font-bold ${turnTimeLeft < 5 ? 'animate-ping' : ''}`}>
+                    {turnTimeLeft}
+                  </span>
+                </div>
+                <div className="w-[60px]"></div>
               </div>
 
-              {gameState.status === 'shuffling' ? (
-                <div className="z-50 flex flex-col items-center gap-4 lg:gap-12">
-                   <div className="relative w-24 h-36 lg:w-64 lg:h-96">
-                      <div className="absolute inset-0 shuffle-anim-1 shadow-[0_10px_30px_rgba(0,0,0,0.8)]"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
-                   </div>
-                   <div className="text-lg lg:text-7xl font-black italic tracking-tighter animate-pulse text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.6)] uppercase">SHUFFLING...</div>
-                </div>
-              ) : gameState.isGameOver ? (
-                <>
-                  <ConfettiBurst />
-                  <div className="z-[200] bg-black/95 backdrop-blur-[100px] p-6 lg:p-32 rounded-3xl lg:rounded-[5rem] border-2 lg:border-[6px] border-yellow-500/40 text-center animate-in zoom-in duration-700 shadow-[0_0_100px_rgba(234,179,8,0.3)] max-w-4xl w-[85%] flex flex-col items-center">
-                    <div className="text-2xl lg:text-[14rem] mb-2 lg:mb-10 animate-bounce">🏆</div>
-                    <div className="text-emerald-400 text-[8px] lg:text-4xl font-black tracking-[0.4em] mb-1 lg:mb-6 uppercase">VICTORY!</div>
-                    <div className="text-xl lg:text-[12rem] font-black italic tracking-tighter mb-2 lg:mb-8 text-white leading-none uppercase">WINNER!</div>
-                    
-                    <div className="bg-white/5 border border-white/10 rounded-xl lg:rounded-[4rem] p-4 lg:p-20 mb-4 lg:mb-16 w-full shadow-inner">
-                      <div className="text-3xl lg:text-[12rem] font-black text-emerald-400 italic tracking-tighter">
-                        {winningPrize.toFixed(3)} <span className="text-[10px] lg:text-5xl opacity-40 uppercase">SOL</span>
-                      </div>
-                    </div>
-
-                    <button onClick={() => setView('lobby')} className="px-6 lg:px-24 py-2 lg:py-8 bg-white text-black rounded-lg lg:rounded-3xl text-[10px] lg:text-5xl font-black hover:scale-110 active:scale-90 transition-all uppercase">CLAIM</button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="absolute inset-0 z-20 pointer-events-none">
-                    {gameState.players.map((p, idx) => (
-                      <PlayerSlot key={p.id} player={p} index={idx} total={gameState.players.length} active={gameState.currentPlayerIndex === idx} />
-                    ))}
-                  </div>
+              <div className="relative pointer-events-auto w-full flex justify-center h-[110px] lg:h-[180px] overflow-visible">
+                {sortedHand.map((c, idx) => {
+                  const total = sortedHand.length;
+                  const middle = (total - 1) / 2;
+                  const offset = idx - middle;
+                  const rotation = offset * (total > 10 ? 3.5 : 5);
+                  const xShift = offset * (total > 10 ? 22 : 32);
+                  const yShift = Math.abs(offset) * 1.5;
                   
-                  <div className="relative z-[50] flex flex-col items-center justify-center scale-[0.4] sm:scale-[0.8] lg:scale-100 mt-[-22dvh] lg:mt-[-15dvh]">
-                    <div className="flex items-center gap-4 lg:gap-64 relative z-10">
-                      
-                      {/* CARD PACK (DRAW DECK) */}
-                      <div className="flex flex-col items-center gap-4 lg:gap-8">
-                        <div className="relative w-16 h-24 lg:w-48 lg:h-72 cursor-pointer group active:scale-90 transition-all" onClick={drawFromDeck}>
-                           <div className="absolute inset-0 translate-x-1 translate-y-1 bg-white/10 rounded-lg lg:rounded-[2.5rem] border border-white/20"></div>
-                           <div className="absolute inset-0 translate-x-0.5 translate-y-0.5 bg-white/20 rounded-lg lg:rounded-[2.5rem] border border-white/30 shadow-xl"></div>
-                           <div className="relative transform lg:group-hover:-translate-y-4 transition-transform">
-                             <UnoCard card={{} as any} isBack size="lg" disabled={gameState.currentPlayerIndex !== 0 || gameState.status !== 'playing'} />
-                           </div>
-                        </div>
-                        <div className="px-2 py-0.5 lg:px-6 lg:py-2 bg-black/60 rounded-full border border-white/10 backdrop-blur-md">
-                           <span className="text-[7px] lg:text-lg font-black text-white/90 italic tracking-widest uppercase">DRAW</span>
-                        </div>
-                      </div>
-
-                      {/* DISCARD PILE */}
-                      <div className="flex flex-col items-center gap-4 lg:gap-8">
-                        <div className="relative w-16 h-24 lg:w-48 lg:h-72 flex items-center justify-center">
-                          {gameState.discardPile.slice(-3).map((c, i) => (
-                            <div key={c.id} className="absolute inset-0 transition-all duration-500" style={{ transform: `rotate(${(i-1)*12}deg) translate(${(i-1)*4}px, ${(i-1)*2}px)`, zIndex: i + 10 }}>
-                              <UnoCard card={c} size="lg" isSpecialEffect={c.id === activeSpecialId} />
-                            </div>
-                          ))}
-                        </div>
-                        <div className="px-2 py-0.5 lg:px-6 lg:py-2 bg-emerald-500/10 rounded-full border border-emerald-500/20 backdrop-blur-md">
-                           <span className="text-[7px] lg:text-lg font-black text-emerald-400 italic tracking-widest uppercase">PLAY</span>
-                        </div>
-                      </div>
+                  return (
+                    <div 
+                      key={c.id} 
+                      className="absolute transition-all duration-300 hover:-translate-y-20 active:scale-90 transform-gpu z-10"
+                      style={{ 
+                        zIndex: 10 + idx,
+                        transform: `translateX(${xShift}px) translateY(${yShift}px) rotate(${rotation}deg)`,
+                        transformOrigin: 'bottom center'
+                      }}
+                    >
+                      <UnoCard card={c} size="md" onClick={() => playCard(c)} disabled={gameState.currentPlayerIndex !== 0} />
                     </div>
-
-                    {/* Pot Display */}
-                    <div className="mt-8 lg:mt-20 px-4 lg:px-16 py-2 lg:py-8 bg-black/90 border border-white/10 rounded-xl lg:rounded-[3rem] backdrop-blur-3xl relative z-20 shadow-[0_0_20px_rgba(153,69,255,0.4)] group border-b-emerald-500/60">
-                       <div className="flex items-center gap-2 lg:gap-10">
-                          <span className="text-xl lg:text-6xl animate-float-money">💸</span>
-                          <div className="flex flex-col">
-                             <span className="text-[6px] lg:text-[12px] font-black text-white/30 tracking-[0.3em] lg:tracking-[0.5em] mb-0.5 uppercase">POT TOTAL</span>
-                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-white to-emerald-400 font-black italic tracking-tighter text-xl lg:text-9xl">
-                               {winningPrize.toFixed(3)} <span className="text-[10px] lg:text-4xl opacity-40">SOL</span>
-                             </span>
-                          </div>
-                          <span className="text-xl lg:text-6xl animate-float-money" style={{ animationDelay: '0.3s' }}>💰</span>
-                       </div>
-                    </div>
-                  </div>
-
-                  {dealingCardTarget && (
-                    <div className="dealing-card-anim" style={{ '--tx': `${dealingCardTarget.x}vw`, '--ty': `${dealingCardTarget.y}vh` } as any}>
-                       <UnoCard card={{} as any} isBack size="sm" disabled />
-                    </div>
-                  )}
-
-                  {/* FLOATING PLAYER UI - Background line removed to show full table */}
-                  <div className="absolute bottom-0 w-full flex flex-col items-center z-[100] bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-6 lg:pt-12 pb-4 lg:pb-10">
-                     <div className="flex items-center justify-between w-full px-3 lg:px-20 mb-2 lg:mb-4 pointer-events-none">
-                        <button 
-                          onClick={handleLeaveGame}
-                          className="bg-red-500/20 border border-red-500/40 px-3 lg:px-8 py-1 lg:py-3 rounded-full text-[6px] lg:text-xs font-black text-red-500 hover:bg-red-500 hover:text-white transition-all tracking-tighter lg:tracking-widest uppercase pointer-events-auto"
-                        >
-                          LEAVE GAME
-                        </button>
-                        <div className={`px-4 lg:px-16 py-1 lg:py-4 rounded-full text-[8px] lg:text-lg font-black italic tracking-[0.1em] lg:tracking-[0.4em] transition-all border lg:border-2 pointer-events-auto ${gameState.currentPlayerIndex === 0 ? 'bg-emerald-600 text-white animate-pulse border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.5)]' : 'bg-white/5 text-white/10 border-white/5'}`}>
-                          {gameState.currentPlayerIndex === 0 ? 'YOUR TURN' : 'WAITING...'}
-                        </div>
-                        <div className="w-[40px] lg:w-[120px]"></div>
-                     </div>
-                     
-                     {/* SORTED HAND: Colors first, then Action cards on right side */}
-                     <div className="w-full overflow-x-auto custom-scrollbar flex justify-start lg:justify-center gap-1 lg:gap-4 px-2 lg:px-16 pb-2 lg:pb-4 mask-fade-edges min-h-[80px] lg:min-h-[160px]">
-                        {sortedHand.map((c) => (
-                          <div key={c.id} className="hover:z-[110] transition-all lg:hover:-translate-y-12 active:scale-90 scale-[0.55] lg:scale-[0.9] flex-shrink-0 origin-bottom">
-                             <UnoCard card={c} size="md" onClick={() => playCard(c)} disabled={gameState.currentPlayerIndex !== 0} />
-                          </div>
-                        ))}
-                     </div>
-                  </div>
-                </>
-              )}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
       </main>
 
-      <footer className="flex-none z-[110] hidden lg:flex justify-between items-center p-8 bg-black/95 backdrop-blur-3xl border-t border-white/5 text-white/20">
-        <div className="text-xs font-black tracking-[0.5em] uppercase">SOLUNO ROYALE // NETWORK: SOLANA MAINNET</div>
-        <div className="flex gap-16 items-center">
-          {solPrice && <span className="text-sm font-black text-emerald-400 italic tracking-widest uppercase">SOL: ${solPrice.toFixed(2)}</span>}
-          <span className="text-sm font-black italic tracking-widest uppercase">RAKE: 10%</span>
+      {gameState.isGameOver && (
+        <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center text-center p-8 animate-in zoom-in duration-500">
+           <div className="text-8xl mb-8 drop-shadow-[0_0_40px_#14F195]">🏆</div>
+           <h3 className="text-6xl lg:text-9xl font-black italic tracking-tighter text-white mb-4">{gameState.winner === 'YOU' ? 'TABLE MASTER!' : `${gameState.winner} WON`}</h3>
+           <p className="text-[#14F195] font-black text-4xl mb-12 tracking-tight">TOTAL POT: {winningPrize.toFixed(2)} SOL</p>
+           <button onClick={() => setView('lobby')} className="bg-white text-black px-24 py-5 rounded-2xl font-black text-lg uppercase shadow-[0_0_60px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 transition-all">RE-ENTRY</button>
         </div>
-      </footer>
+      )}
     </div>
   );
 };

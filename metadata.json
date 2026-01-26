@@ -1,8 +1,12 @@
 {
   "name": "SOLUNO Royale",
-  "description": "The premier high-stakes blockchain card game on Solana. Verify holdings to join pools and win the pot in SOLUNO.",
+  "description": "High-stakes Solana card gaming. 10 players, 1 pot, total domination. Optimized for Solana Mobile.",
   "requestFramePermissions": [
     "camera",
     "microphone"
-  ]
+  ],
+  "dAppStore": {
+    "category": "Games",
+    "orientation": "landscape"
+  }
 }

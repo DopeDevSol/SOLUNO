@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOLUNO - SOLANA EDITION</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SOLUNO Royale - Solana Mobile</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
@@ -12,163 +14,137 @@
       background-color: #000000;
       color: #ffffff;
       margin: 0;
-      overflow-x: hidden;
+      overflow: hidden;
       text-transform: uppercase;
+      overscroll-behavior: none;
     }
     .font-bungee {
       font-family: 'Bungee', cursive;
     }
     
-    /* Green Felt Table Styling */
+    /* High-Quality Felt Table */
     .felt-table {
-      background: radial-gradient(circle at center, #1a4d1a 0%, #0d2b0d 100%);
+      background: radial-gradient(circle at center, #1b4d2a 0%, #0a2412 70%, #051209 100%);
       position: relative;
-      box-shadow: inset 0 0 100px rgba(0,0,0,0.5);
+      box-shadow: inset 0 0 150px rgba(0,0,0,0.9);
     }
     .felt-table::after {
       content: '';
       position: absolute;
       inset: 0;
       background-image: url('https://www.transparenttextures.com/patterns/felt.png');
-      opacity: 0.15;
+      opacity: 0.12;
       pointer-events: none;
+      mix-blend-mode: overlay;
     }
 
-    /* Solana Logo watermark on table */
-    .solana-watermark {
+    /* Direction Indicator Rings */
+    .direction-ring {
       position: absolute;
-      width: 30vw;
-      height: 30vw;
-      opacity: 0.05;
-      pointer-events: none;
-      filter: grayscale(1);
-    }
-
-    /* Disco Lights Animation */
-    @keyframes disco {
-      0% { transform: translate(-10%, -10%) scale(1); opacity: 0.3; }
-      50% { transform: translate(10%, 10%) scale(1.2); opacity: 0.6; }
-      100% { transform: translate(-10%, -10%) scale(1); opacity: 0.3; }
-    }
-    .disco-bg {
-      position: fixed;
-      inset: -50px;
-      z-index: 0;
-      pointer-events: none;
-      filter: blur(80px);
-      opacity: 0.4;
-    }
-    .disco-light {
-      position: absolute;
-      width: 40vw;
-      height: 40vw;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 45vh;
+      height: 45vh;
+      border: 2px dashed rgba(20, 241, 149, 0.1);
       border-radius: 50%;
-      animation: disco 8s infinite alternate ease-in-out;
+      pointer-events: none;
+      z-index: 1;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Rotating Neon Circle - Solana Theme */
-    @keyframes rotate-cw { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    @keyframes rotate-ccw { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
-    
-    .neon-circle-container {
+    @keyframes rotate-cw { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+    @keyframes rotate-ccw { from { transform: translate(-50%, -50%) rotate(360deg); } to { transform: translate(-50%, -50%) rotate(0deg); } }
+
+    .spin-cw { animation: rotate-cw 20s linear infinite; }
+    .spin-ccw { animation: rotate-ccw 20s linear infinite; }
+
+    /* Woven Watermark */
+    .table-watermark-center {
       position: absolute;
-      width: 140%;
-      height: 140%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 30vh;
+      height: 30vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       pointer-events: none;
       z-index: 1;
     }
-    .neon-circle {
-      width: 100%;
-      height: 100%;
-      border: 6px dashed;
-      border-image: linear-gradient(to right, #9945FF, #14F195) 1;
-      border-radius: 50%;
-      box-shadow: 0 0 30px #9945FF, inset 0 0 30px #14F195;
-      opacity: 0.4;
-    }
-    .animate-cw { animation: rotate-cw 15s linear infinite; }
-    .animate-ccw { animation: rotate-ccw 15s linear infinite; }
 
-    /* Floating Money Animation */
-    @keyframes float-money {
-      0%, 100% { transform: translateY(0) scale(1) rotate(0deg); filter: drop-shadow(0 0 10px #22c55e); }
-      50% { transform: translateY(-10px) scale(1.2) rotate(10deg); filter: drop-shadow(0 0 25px #22c55e); }
-    }
-    .animate-float-money {
-      display: inline-block;
-      animation: float-money 1.5s ease-in-out infinite;
+    .watermark-text {
+      font-family: 'Bungee';
+      font-size: 3vh;
+      color: white;
+      opacity: 0.03;
+      font-style: italic;
+      letter-spacing: 0.2em;
     }
 
-    /* +4 Card Impact Animation */
+    /* Rotation Overlay */
+    #rotation-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    @media (orientation: portrait) {
+      #rotation-overlay {
+        display: flex;
+      }
+    }
+
+    /* Draw 4 Impact Animation */
     @keyframes draw4-impact {
-      0% { transform: scale(1); filter: hue-rotate(0deg) brightness(1); }
-      50% { transform: scale(1.3); filter: hue-rotate(180deg) brightness(2); box-shadow: 0 0 50px #fff; }
-      100% { transform: scale(1); filter: hue-rotate(360deg) brightness(1); }
+      0% { transform: scale(1) rotate(0deg); filter: hue-rotate(0deg) brightness(1); }
+      25% { transform: scale(1.6) rotate(15deg); filter: hue-rotate(90deg) brightness(2); box-shadow: 0 0 80px #fff; }
+      50% { transform: scale(1.4) rotate(-15deg); filter: hue-rotate(180deg) brightness(1.5); }
+      100% { transform: scale(1) rotate(0deg); filter: hue-rotate(360deg) brightness(1); }
     }
-    .animate-draw4-impact { animation: draw4-impact 1s ease-in-out; }
+    .animate-draw4-impact {
+      animation: draw4-impact 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
 
-    @keyframes card-shuffle-main {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      25% { transform: translate(-30px, -5px) rotate(-8deg); z-index: 10; }
-      50% { transform: translate(0, 0) rotate(0deg); z-index: 5; }
-      75% { transform: translate(30px, 5px) rotate(8deg); z-index: 10; }
+    /* Card Dealing Animation */
+    @keyframes deal-card {
+      0% { transform: translate(-50%, -50%) scale(0.1) rotate(0deg); opacity: 0; }
+      20% { opacity: 1; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(0.5) rotate(360deg); opacity: 0; }
     }
-    
-    .shuffle-anim-1 { animation: card-shuffle-main 0.4s ease-in-out infinite; }
-
-    @keyframes deal-card-cool {
-      0% { transform: translate(-50%, -50%) scale(0.2) rotate(0deg); opacity: 0; }
-      20% { opacity: 1; scale: 1.2; }
-      100% { transform: translate(var(--tx), var(--ty)) scale(0.6) rotate(360deg); opacity: 0; }
-    }
-    
     .dealing-card-anim {
       position: absolute;
       left: 50%;
       top: 50%;
       z-index: 100;
       pointer-events: none;
-      animation: deal-card-cool 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      animation: deal-card 0.5s ease-out forwards;
     }
 
-    @keyframes skip-flash {
-      0% { transform: scale(1); filter: brightness(1); }
-      15% { transform: scale(1.4); filter: brightness(4) contrast(2); z-index: 100; }
-      100% { transform: scale(1); filter: brightness(1); }
-    }
-    .animate-skip-impact { animation: skip-flash 0.6s ease-out; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    @keyframes reverse-spin {
-      0% { transform: rotateY(0deg) scale(1); }
-      50% { transform: rotateY(180deg) scale(1.3); filter: brightness(1.5); }
-      100% { transform: rotateY(360deg) scale(1); }
-    }
-    .animate-reverse-impact { animation: reverse-spin 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-
-    /* Confetti Animation */
-    @keyframes confetti-fall {
-      0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
-    }
-    .confetti {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      z-index: 150;
-      pointer-events: none;
-      animation: confetti-fall 4s linear forwards;
+    .mask-fade-edges {
+      mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
     }
 
-    @keyframes prize-pop {
-      0% { transform: scale(0.8); opacity: 0; }
-      60% { transform: scale(1.1); opacity: 1; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-    .animate-prize-pop { animation: prize-pop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    /* 3D Stack Offsets */
+    .stack-1 { transform: translate(-2px, -2px); }
+    .stack-2 { transform: translate(-4px, -4px); }
+    .stack-3 { transform: translate(-6px, -6px); }
 
-    .soluno-bg {
-      background-color: #000;
-      overflow: hidden;
+    .hand-tray-bg {
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%);
+      backdrop-filter: blur(12px);
     }
   </style>
 <script type="importmap">
@@ -182,12 +158,11 @@
 }
 </script>
 </head>
-<body class="soluno-bg">
-  <div class="disco-bg">
-    <div class="disco-light" style="top: 10%; left: 10%; background: #ed1c24;"></div>
-    <div class="disco-light" style="top: 60%; left: 70%; background: #0054a6; animation-delay: -2s;"></div>
-    <div class="disco-light" style="top: 20%; left: 80%; background: #39b54a; animation-delay: -4s;"></div>
-    <div class="disco-light" style="top: 70%; left: 10%; background: #fcee21; animation-delay: -6s;"></div>
+<body>
+  <div id="rotation-overlay">
+    <div class="w-16 h-16 mb-4 animate-bounce text-4xl">🔄</div>
+    <h2 class="text-xl font-black italic mb-1">LANDSCAPE MODE</h2>
+    <p class="text-white/30 text-[10px] tracking-widest uppercase">Rotate device to join the table</p>
   </div>
   <div id="root"></div>
 </body>
