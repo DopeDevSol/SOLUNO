@@ -1,20 +1,34 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-// Always use the process.env.API_KEY directly for initialization as per guidelines
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const FALLBACK_HYPE = [
+  "The table is heating up! Who's holding the Wild?",
+  "Big SOL on the line, stay sharp.",
+  "That move was calculated. Or was it?",
+  "The dealer is watching... play your cards right.",
+  "High stakes, high pressure. Don't blink.",
+  "Solana speed, Solana stakes. Let's go!",
+  "Is that a bluff or a winning hand?",
+  "The pot is growing. Tension is peaking!",
+  "SOLUNO Royale: Where legends are minted.",
+  "Don't let the bots outplay you!"
+];
 
 export const getGameCommentary = async (gameStateSummary: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `You are a hype-man and strategic commentator for a high-stakes Solana card tournament called SOLUNO Royale. 
-      Analyze this game state and provide a short, punchy, witty comment (max 20 words): ${gameStateSummary}`,
+      Analyze this game state and provide a short, punchy, witty comment (max 15 words). 
+      If there's nothing special, be encouraging.
+      STATE: ${gameStateSummary}`,
     });
-    return response.text || "The tension is rising at the SOLUNO table!";
+    return response.text?.trim() || FALLBACK_HYPE[Math.floor(Math.random() * FALLBACK_HYPE.length)];
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Next move is critical!";
+    // Gracefully handle 429 (Quota) and other errors with local fallback
+    console.warn("Gemini Quota/Error - Using fallback hype.");
+    return FALLBACK_HYPE[Math.floor(Math.random() * FALLBACK_HYPE.length)];
   }
 };
 
@@ -22,15 +36,13 @@ export const askUnoAssistant = async (query: string, stateSummary: string): Prom
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are the Official SOLUNO Royale Referee and Strategy Assistant. 
-      A player is asking a question during a high-stakes Solana game.
-      CURRENT GAME STATE: ${stateSummary}
-      PLAYER QUESTION: ${query}
-      Provide a helpful, concise answer based on official rules and the current game state. (Max 50 words)`,
+      contents: `You are the Official SOLUNO Royale Referee. 
+      Help the player. (Max 30 words)
+      STATE: ${stateSummary}
+      Q: ${query}`,
     });
-    return response.text || "I'm not sure, but keep playing!";
+    return response.text || "Stick to the strategy, focus on the colors.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "The referee is currently busy, try again in a moment!";
+    return "The referee is checking the replay. Keep playing!";
   }
 };

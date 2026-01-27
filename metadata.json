@@ -1,12 +1,15 @@
 {
   "name": "SOLUNO Royale",
-  "description": "High-stakes Solana card gaming. 10 players, 1 pot, total domination. Optimized for Solana Mobile.",
+  "description": "High-stakes Solana card gaming. 10 players, 1 pot, total domination. Optimized for Solana Seeker.",
   "requestFramePermissions": [
-    "camera",
-    "microphone"
+    "camera"
   ],
   "dAppStore": {
     "category": "Games",
-    "orientation": "landscape"
+    "orientation": "landscape",
+    "install_url": "https://soluno.royale",
+    "publisher": "Soluno Labs",
+    "mobile_wallet_adapter": true,
+    "seed_vault": true
   }
 }
