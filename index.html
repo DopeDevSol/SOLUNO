@@ -84,6 +84,43 @@
       letter-spacing: 0.2em;
     }
 
+    /* Enhanced Confetti Animation */
+    @keyframes confetti-fall {
+      0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 1; }
+      25% { transform: translateY(25vh) translateX(15px) rotate(90deg); }
+      50% { transform: translateY(50vh) translateX(-15px) rotate(180deg); }
+      75% { transform: translateY(75vh) translateX(15px) rotate(270deg); }
+      100% { transform: translateY(110vh) translateX(0) rotate(360deg); opacity: 0; }
+    }
+    
+    @keyframes confetti-wobble {
+      0%, 100% { transform: scaleX(1); }
+      50% { transform: scaleX(0.5); }
+    }
+
+    .confetti-piece {
+      position: absolute;
+      top: -20px;
+      animation: confetti-fall linear infinite;
+      z-index: 301;
+      will-change: transform;
+    }
+
+    .confetti-inner {
+      width: 100%;
+      height: 100%;
+      animation: confetti-wobble 0.5s ease-in-out infinite;
+    }
+
+    /* Victory Screen Polish */
+    @keyframes golden-glow {
+      0%, 100% { filter: drop-shadow(0 0 20px #fcee21); transform: scale(1) rotate(0deg); }
+      50% { filter: drop-shadow(0 0 50px #14F195); transform: scale(1.1) rotate(5deg); }
+    }
+    .winner-cup-animation {
+      animation: golden-glow 2s ease-in-out infinite;
+    }
+
     /* Rotation Overlay */
     #rotation-overlay {
       display: none;
@@ -136,11 +173,6 @@
     .mask-fade-edges {
       mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
     }
-
-    /* 3D Stack Offsets */
-    .stack-1 { transform: translate(-2px, -2px); }
-    .stack-2 { transform: translate(-4px, -4px); }
-    .stack-3 { transform: translate(-6px, -6px); }
 
     .hand-tray-bg {
       background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%);

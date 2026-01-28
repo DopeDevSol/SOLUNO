@@ -1,15 +1,37 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { POOLS, HOUSE_FEE_PERCENT } from './constants';
-import { Card, GameState, Player, Pool, CardColor } from './types';
+import { Card, GameState, Player, Pool, CardColor, LeaderboardEntry, GameHistoryEntry } from './types';
 import UnoCard from './components/UnoCard';
 import { getGameCommentary } from './services/geminiService';
 
 const MAX_TURN_TIME = 15;
 const COMMENTARY_COOLDOWN = 20000; 
 
+const MOCK_LEADERBOARD: LeaderboardEntry[] = [
+  { rank: 1, address: "7xV1...9pQz", wins: 142, totalWon: 84.50 },
+  { rank: 2, address: "D8eW...2mNx", wins: 118, totalWon: 62.15 },
+  { rank: 3, address: "A3sK...8jLp", wins: 95, totalWon: 44.20 },
+  { rank: 4, address: "B9qM...1vRb", wins: 82, totalWon: 31.80 },
+  { rank: 5, address: "F2nH...5tYs", wins: 76, totalWon: 28.45 },
+  { rank: 6, address: "E4mJ...9vKn", wins: 64, totalWon: 22.10 },
+  { rank: 7, address: "K1pL...3xZq", wins: 51, totalWon: 18.50 },
+  { rank: 8, address: "R6tN...7mBc", wins: 42, totalWon: 12.30 },
+];
+
+const MOCK_HISTORY: GameHistoryEntry[] = [
+  { id: "1", winner: "7xV1...9pQz", poolFee: 1.0, prize: 9.0, timeAgo: "2m ago", playersCount: 10 },
+  { id: "2", winner: "D8eW...2mNx", poolFee: 0.5, prize: 4.5, timeAgo: "5m ago", playersCount: 10 },
+  { id: "3", winner: "A3sK...8jLp", poolFee: 0.25, prize: 2.25, timeAgo: "12m ago", playersCount: 10 },
+  { id: "4", winner: "B9qM...1vRb", poolFee: 1.0, prize: 9.0, timeAgo: "18m ago", playersCount: 10 },
+  { id: "5", winner: "F2nH...5tYs", poolFee: 0.1, prize: 0.9, timeAgo: "24m ago", playersCount: 10 },
+  { id: "6", winner: "7xV1...9pQz", poolFee: 0.5, prize: 4.5, timeAgo: "31m ago", playersCount: 10 },
+  { id: "7", winner: "K1pL...3xZq", poolFee: 1.0, prize: 9.0, timeAgo: "45m ago", playersCount: 10 },
+  { id: "8", winner: "E4mJ...9vKn", poolFee: 0.05, prize: 0.45, timeAgo: "1h ago", playersCount: 10 },
+];
+
 const App: React.FC = () => {
   const [solPrice, setSolPrice] = useState<number | null>(null);
-  const [view, setView] = useState<'lobby' | 'game' | 'leaderboard'>('lobby');
+  const [view, setView] = useState<'lobby' | 'game' | 'leaderboard' | 'history'>('lobby');
   const [activeSpecialId, setActiveSpecialId] = useState<string | null>(null);
   const [dealingCardTarget, setDealingCardTarget] = useState<{ x: number, y: number } | null>(null);
   const [commentary, setCommentary] = useState("Seeker session active...");
@@ -66,20 +88,6 @@ const App: React.FC = () => {
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver]);
-
-  useEffect(() => {
-    if (gameState.status === 'playing' && !gameState.isGameOver) {
-      const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-      const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-      const isCriticalMoment = currentPlayer.isLocal || topCard.value === 'draw4' || topCard.value === 'wild' || currentPlayer.hand.length <= 2;
-      const now = Date.now();
-      const onCooldown = now - lastCommentaryTimeRef.current < COMMENTARY_COOLDOWN;
-      if (isCriticalMoment && !onCooldown) {
-        lastCommentaryTimeRef.current = now;
-        getGameCommentary(`${currentPlayer?.name} played ${topCard?.color} ${topCard?.value}.`).then(setCommentary);
-      }
-    }
-  }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver, gameState.discardPile]);
 
   const handleTimeout = useCallback(() => drawFromDeck(), [gameState.currentPlayerIndex]);
 
@@ -277,18 +285,139 @@ const App: React.FC = () => {
                    <button onClick={() => setWalletConnected(true)} className="bg-white text-black px-12 py-4 rounded-2xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]">LINK SEEKER WALLET</button>
                 </div>
              ) : (
-               <div className="grid grid-cols-5 gap-4 max-w-5xl w-full px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                {POOLS.map(p => (
-                  <button key={p.id} onClick={() => enterPool(p)} className="bg-black/90 border border-white/10 p-6 rounded-[2rem] flex flex-col items-center hover:border-[#14F195] hover:scale-105 transition-all group active:scale-95 shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-8 h-8 bg-[#14F195]/10 rounded-bl-3xl flex items-center justify-center">
-                       <span className="text-[7px] font-black text-[#14F195] italic">LIVE</span>
-                    </div>
-                    <span className="text-4xl font-black text-[#14F195] italic leading-none">{p.entryFee}</span>
-                    <span className="text-[8px] text-white/40 mt-2 uppercase tracking-widest font-bold">SOL BUY-IN</span>
+               <div className="flex flex-col items-center gap-8 w-full">
+                <div className="grid grid-cols-5 gap-4 max-w-5xl w-full px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  {POOLS.map(p => (
+                    <button key={p.id} onClick={() => enterPool(p)} className="bg-black/90 border border-white/10 p-6 rounded-[2rem] flex flex-col items-center hover:border-[#14F195] hover:scale-105 transition-all group active:scale-95 shadow-2xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-8 h-8 bg-[#14F195]/10 rounded-bl-3xl flex items-center justify-center">
+                        <span className="text-[7px] font-black text-[#14F195] italic">LIVE</span>
+                      </div>
+                      <span className="text-4xl font-black text-[#14F195] italic leading-none">{p.entryFee}</span>
+                      <span className="text-[8px] text-white/40 mt-2 uppercase tracking-widest font-bold">SOL BUY-IN</span>
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setView('leaderboard')}
+                    className="bg-black/60 border border-white/5 px-8 py-3 rounded-full flex items-center gap-3 hover:bg-white/5 transition-all group"
+                  >
+                    <span className="text-[10px] font-black text-white/40 tracking-[0.3em] uppercase group-hover:text-[#14F195] transition-colors">Hall of Fame</span>
+                    <div className="w-5 h-5 bg-gradient-to-r from-[#9945FF] to-[#14F195] rounded-full flex items-center justify-center text-[10px]">🏆</div>
                   </button>
-                ))}
-              </div>
+
+                  <button 
+                    onClick={() => setView('history')}
+                    className="bg-black/60 border border-white/5 px-8 py-3 rounded-full flex items-center gap-3 hover:bg-white/5 transition-all group"
+                  >
+                    <span className="text-[10px] font-black text-white/40 tracking-[0.3em] uppercase group-hover:text-[#14F195] transition-colors">Live Royale Feed</span>
+                    <div className="w-5 h-5 bg-white/5 rounded-full flex items-center justify-center text-[10px]">📡</div>
+                  </button>
+                </div>
+               </div>
              )}
+          </div>
+        )}
+
+        {view === 'leaderboard' && (
+          <div className="h-full w-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-500">
+            <div className="max-w-4xl w-full flex flex-col items-center">
+              <div className="text-center mb-10">
+                <div className="inline-block px-4 py-1 bg-[#14F195]/10 border border-[#14F195]/20 rounded-full text-[9px] text-[#14F195] font-black tracking-[0.4em] mb-4 uppercase">Royale Hall of Fame</div>
+                <h2 className="text-6xl font-black italic tracking-tighter text-white">THE ELITE MASTERS</h2>
+                <p className="text-white/30 text-[10px] tracking-[0.5em] mt-3 font-bold uppercase">Top earners across all brackets</p>
+              </div>
+
+              <div className="w-full bg-black/40 backdrop-blur-3xl border border-white/5 rounded-[3rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
+                <div className="grid grid-cols-4 px-10 py-6 border-b border-white/5 bg-white/5">
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">RANK</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">MASTER</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center">WINS</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-right">TOTAL WON</span>
+                </div>
+                <div className="max-h-[50vh] overflow-y-auto no-scrollbar">
+                  {MOCK_LEADERBOARD.map((entry, idx) => (
+                    <div 
+                      key={entry.address} 
+                      className={`grid grid-cols-4 px-10 py-5 border-b border-white/5 items-center transition-all hover:bg-white/5 ${entry.rank === 1 ? 'bg-[#14F195]/5' : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xl font-black italic ${entry.rank <= 3 ? 'text-[#14F195]' : 'text-white/40'}`}>
+                          #{entry.rank}
+                        </span>
+                        {entry.rank === 1 && <span className="text-xl animate-bounce">🏆</span>}
+                      </div>
+                      <span className="font-mono text-[11px] text-white/80">{entry.address}</span>
+                      <span className="text-sm font-black text-white text-center italic">{entry.wins}</span>
+                      <div className="text-right flex flex-col">
+                        <span className="text-sm font-black text-[#14F195] italic leading-none">{entry.totalWon.toFixed(2)} SOL</span>
+                        <span className="text-[8px] text-white/20 font-bold uppercase tracking-widest mt-1">Verified</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setView('lobby')}
+                className="mt-12 bg-white text-black px-12 py-4 rounded-2xl font-black text-sm uppercase hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]"
+              >
+                Return to Lobby
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === 'history' && (
+          <div className="h-full w-full flex flex-col items-center justify-center p-8 animate-in slide-in-from-right-10 duration-500">
+            <div className="max-w-4xl w-full flex flex-col items-center">
+              <div className="text-center mb-8">
+                <div className="inline-block px-4 py-1 bg-[#14F195]/10 border border-[#14F195]/20 rounded-full text-[9px] text-[#14F195] font-black tracking-[0.4em] mb-4 uppercase">Live Royale Feed</div>
+                <h2 className="text-6xl font-black italic tracking-tighter text-white">RECENT CONQUESTS</h2>
+                <p className="text-white/30 text-[10px] tracking-[0.5em] mt-3 font-bold uppercase">Last 24 hours of total table domination</p>
+              </div>
+
+              <div className="w-full bg-black/40 backdrop-blur-3xl border border-white/5 rounded-[3rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
+                <div className="grid grid-cols-5 px-10 py-6 border-b border-white/5 bg-white/5">
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">TIME</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">WINNER</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center">TIER</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center">TABLE</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-right">PRIZE</span>
+                </div>
+                <div className="max-h-[55vh] overflow-y-auto no-scrollbar">
+                  {MOCK_HISTORY.map((entry) => (
+                    <div 
+                      key={entry.id} 
+                      className="grid grid-cols-5 px-10 py-6 border-b border-white/5 items-center transition-all hover:bg-white/5 group"
+                    >
+                      <span className="text-[10px] font-bold text-white/40 group-hover:text-white/60 transition-colors uppercase">{entry.timeAgo}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-[#14F195] rounded-full animate-pulse shadow-[0_0_8px_#14F195]"></div>
+                        <span className="font-mono text-[11px] text-white/80">{entry.winner}</span>
+                      </div>
+                      <div className="flex justify-center">
+                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${entry.poolFee >= 0.5 ? 'bg-[#9945FF]/20 text-[#9945FF] border border-[#9945FF]/40' : 'bg-white/5 text-white/40 border border-white/10'}`}>
+                          {entry.poolFee >= 1.0 ? '🐋 Whale' : entry.poolFee >= 0.25 ? '🦈 Shark' : '🐟 Minnow'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-white/30 text-center uppercase tracking-widest">{entry.playersCount} Players</span>
+                      <div className="text-right">
+                        <span className="text-lg font-black text-[#14F195] italic leading-none drop-shadow-[0_0_15px_rgba(20,241,149,0.3)]">+{entry.prize.toFixed(2)} SOL</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setView('lobby')}
+                className="mt-12 bg-white text-black px-12 py-4 rounded-2xl font-black text-sm uppercase hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]"
+              >
+                Return to Lobby
+              </button>
+            </div>
           </div>
         )}
 
@@ -298,26 +427,53 @@ const App: React.FC = () => {
             <div className="table-watermark-center"><div className="watermark-text">SOLUNO</div><div className="watermark-text mt-2" style={{ fontSize: '1.5vh' }}>TABLE PRO #8831</div></div>
             <div className="absolute top-[5%] right-[2%] z-[60]"><div className="bg-black/95 backdrop-blur-2xl border border-white/10 px-4 py-2 rounded-xl max-w-[200px] shadow-2xl"><p className="text-[10px] font-bold text-[#14F195] leading-tight italic">"{commentary}"</p></div></div>
             <div className="absolute inset-0 z-10">{gameState.players.map((p, i) => <PlayerSlot key={p.id} player={p} index={i} active={gameState.currentPlayerIndex === i} />)}</div>
-            <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-16 lg:gap-32 z-30 scale-[0.7] lg:scale-100">
-               <div className="flex flex-col items-center gap-3 group" onClick={drawFromDeck}>
-                  <div className="relative">
-                     <div className="absolute stack-2"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
-                     <div className="absolute stack-1"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
-                     <div className="relative transform group-active:translate-y-1 transition-transform"><UnoCard card={{} as any} isBack size="lg" disabled={gameState.currentPlayerIndex !== 0} /></div>
+            
+            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-20 lg:gap-40 z-30 scale-[0.7] lg:scale-100">
+               {/* Deck Stack */}
+               <div className="flex flex-col items-center gap-4 group" onClick={drawFromDeck}>
+                  <div className="relative cursor-pointer transition-transform hover:scale-105 active:scale-95">
+                     <div className="absolute top-0 left-0 rotate-[2deg] translate-x-1 translate-y-1 opacity-40"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
+                     <div className="absolute top-0 left-0 rotate-[-1deg] -translate-x-0.5 translate-y-0.5 opacity-60"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
+                     <div className="absolute top-0 left-0 rotate-[3deg] translate-x-0.5 -translate-y-0.5 opacity-80"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
+                     <div className="relative z-10 transform transition-transform group-hover:translate-y-[-5px]"><UnoCard card={{} as any} isBack size="lg" disabled={gameState.currentPlayerIndex !== 0} /></div>
                   </div>
-                  <span className="text-[9px] font-black text-white/30 tracking-[0.4em]">DECK</span>
+                  <span className={`text-[10px] font-black tracking-[0.5em] transition-colors ${gameState.currentPlayerIndex === 0 ? 'text-[#14F195] animate-pulse' : 'text-white/20'}`}>DRAW DECK</span>
                </div>
-               <div className="flex flex-col items-center gap-3">
-                  <div className="relative w-24 h-36 flex items-center justify-center">
-                    <svg className="absolute w-[140%] h-[140%] rotate-[-90deg] pointer-events-none opacity-40"><circle cx="50%" cy="50%" r="48%" stroke={turnTimeLeft < 5 ? '#ef4444' : '#14F195'} strokeWidth="4" fill="transparent" strokeDasharray="300" strokeDashoffset={300 - (300 * (turnTimeLeft / MAX_TURN_TIME))} className="transition-all duration-1000" /></svg>
-                    {gameState.discardPile.length > 1 && <div className="absolute opacity-20 rotate-[-12deg] translate-x-1 translate-y-1"><UnoCard card={gameState.discardPile[gameState.discardPile.length - 2]} size="lg" disabled /></div>}
-                    {gameState.discardPile.slice(-1).map(c => <UnoCard key={c.id} card={c} size="lg" isSpecialEffect={c.id === activeSpecialId} />)}
+
+               {/* Discard Pile */}
+               <div className="flex flex-col items-center gap-4">
+                  <div className="relative w-32 h-44 flex items-center justify-center">
+                    {/* Turn Timer Halo */}
+                    <div className="absolute -inset-8 pointer-events-none">
+                      <svg className="w-full h-full rotate-[-90deg]">
+                        <circle cx="50%" cy="50%" r="46%" 
+                          stroke={turnTimeLeft < 5 ? '#ef4444' : '#14F195'} 
+                          strokeWidth="6" 
+                          fill="transparent" 
+                          strokeDasharray="400" 
+                          strokeDashoffset={400 - (400 * (turnTimeLeft / MAX_TURN_TIME))} 
+                          strokeLinecap="round"
+                          className="transition-all duration-1000 shadow-[0_0_20px_rgba(20,241,149,0.5)]" 
+                        />
+                        <circle cx="50%" cy="50%" r="46%" stroke="white" strokeWidth="1" fill="transparent" opacity="0.1" />
+                      </svg>
+                    </div>
+                    {/* Stacked Pile Visual */}
+                    {gameState.discardPile.length > 2 && <div className="absolute opacity-10 rotate-[-15deg] translate-x-2 translate-y-2"><UnoCard card={gameState.discardPile[gameState.discardPile.length - 3]} size="lg" disabled /></div>}
+                    {gameState.discardPile.length > 1 && <div className="absolute opacity-30 rotate-[8deg] -translate-x-1 translate-y-1"><UnoCard card={gameState.discardPile[gameState.discardPile.length - 2]} size="lg" disabled /></div>}
+                    {gameState.discardPile.slice(-1).map(c => (
+                      <div key={c.id} className="relative z-20">
+                        <UnoCard card={c} size="lg" isSpecialEffect={c.id === activeSpecialId} />
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-[9px] font-black text-[#14F195] tracking-[0.4em]">PILE</span>
+                  <span className="text-[10px] font-black text-[#14F195] tracking-[0.5em] uppercase">Active Pile</span>
                </div>
             </div>
+
             <div className="absolute top-[12%] left-1/2 -translate-x-1/2 z-[40] bg-black/90 border border-[#14F195]/20 px-6 py-2 rounded-full shadow-2xl flex items-center gap-3"><div className="w-2 h-2 bg-[#14F195] rounded-full animate-pulse"></div><span className="text-xl font-black italic text-[#14F195] leading-none tracking-tighter">{winningPrize.toFixed(2)} SOL POT</span></div>
             {dealingCardTarget && <div className="dealing-card-anim" style={{ '--tx': `${dealingCardTarget.x}vw`, '--ty': `${dealingCardTarget.y}vh` } as any}><div className="w-8 h-12 bg-[#111] border border-white/20 rounded-md"></div></div>}
+            
             <div className="absolute bottom-[-10px] w-full z-[200] flex flex-col items-center hand-tray-bg pt-4 pb-6 overflow-visible">
               <div className="flex justify-between items-center w-full px-12 mb-3 pointer-events-none">
                 <button onClick={() => setView('lobby')} className="pointer-events-auto bg-white/5 border border-white/10 px-4 py-1.5 rounded-full text-[8px] font-black text-white/40 hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-widest">EXIT</button>
@@ -327,14 +483,14 @@ const App: React.FC = () => {
                 </div>
                 <div className="w-[60px]"></div>
               </div>
-              <div className="relative pointer-events-auto w-full flex justify-center h-[110px] lg:h-[180px] overflow-visible">
+              <div className="relative pointer-events-auto w-full flex justify-center h-[130px] lg:h-[200px] overflow-visible">
                 {sortedHand.map((c, idx) => {
                   const total = sortedHand.length;
                   const middle = (total - 1) / 2;
                   const offset = idx - middle;
                   const rotation = offset * (total > 10 ? 3.5 : 5);
-                  const xShift = offset * (total > 10 ? 22 : 32);
-                  const yShift = Math.abs(offset) * 1.5;
+                  const xShift = offset * (total > 10 ? 25 : 40);
+                  const yShift = Math.abs(offset) * 2;
                   return (
                     <div key={c.id} className="absolute transition-all duration-300 hover:-translate-y-20 active:scale-90 transform-gpu z-10" style={{ zIndex: 10 + idx, transform: `translateX(${xShift}px) translateY(${yShift}px) rotate(${rotation}deg)`, transformOrigin: 'bottom center' }}>
                       <UnoCard card={c} size="md" onClick={() => playCard(c)} disabled={gameState.currentPlayerIndex !== 0} />
@@ -348,11 +504,71 @@ const App: React.FC = () => {
       </main>
 
       {gameState.isGameOver && (
-        <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center text-center p-8 animate-in zoom-in duration-500">
-           <div className="text-8xl mb-8 drop-shadow-[0_0_40px_#14F195]">🏆</div>
-           <h3 className="text-6xl lg:text-9xl font-black italic tracking-tighter text-white mb-4">{gameState.winner === 'YOU' ? 'TABLE MASTER!' : `${gameState.winner} WON`}</h3>
-           <p className="text-[#14F195] font-black text-4xl mb-12 tracking-tight">TOTAL POT: {winningPrize.toFixed(2)} SOL</p>
-           <button onClick={() => setView('lobby')} className="bg-white text-black px-24 py-5 rounded-2xl font-black text-lg uppercase shadow-[0_0_60px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 transition-all">RE-ENTRY</button>
+        <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center text-center p-8 animate-in zoom-in duration-500 overflow-hidden">
+           {/* Confetti Engine Celebration */}
+           <div className="absolute inset-0 pointer-events-none">
+              {Array.from({ length: 80 }).map((_, i) => {
+                const shape = ['rounded-full', 'rounded-none', 'rounded-sm'][Math.floor(Math.random() * 3)];
+                const colors = ['#14F195', '#9945FF', '#ed1c24', '#fcee21', '#0054a6', '#ffffff'];
+                return (
+                  <div 
+                    key={i} 
+                    className="confetti-piece"
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      animationDelay: `${Math.random() * 5}s`,
+                      animationDuration: `${3 + Math.random() * 4}s`
+                    }}
+                  >
+                    <div className={`confetti-inner ${shape}`} style={{ 
+                      backgroundColor: colors[Math.floor(Math.random() * colors.length)],
+                      width: `${8 + Math.random() * 8}px`,
+                      height: `${12 + Math.random() * 12}px`
+                    }} />
+                  </div>
+                );
+              })}
+           </div>
+
+           <div className="relative z-10 max-w-6xl w-full">
+              <div className="text-[12rem] lg:text-[16rem] mb-4 winner-cup-animation inline-block text-shadow-glow">🏆</div>
+              
+              <div className="mb-6">
+                <span className="text-[#14F195] font-black text-[10px] lg:text-sm tracking-[1em] uppercase block">High Stakes Victory</span>
+              </div>
+
+              <h3 className="text-4xl lg:text-7xl font-black italic tracking-tighter text-white mb-10 uppercase leading-[0.9] drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                CONGRATS "{gameState.winner}" <br/> YOU ARE THE WINNER
+              </h3>
+              
+              <div className="bg-white/5 border border-white/10 p-12 lg:p-16 rounded-[4rem] backdrop-blur-3xl inline-block shadow-[0_40px_100px_rgba(0,0,0,0.8)] relative group overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#14F195]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#14F195] text-black px-6 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_#14F195]">Payout Authorized</div>
+                <p className="text-white/30 text-[10px] lg:text-xs font-bold uppercase tracking-[0.4em] mb-4">You have been awarded</p>
+                <div className="flex items-center justify-center gap-4">
+                  <p className="text-[#14F195] font-black text-8xl lg:text-[12rem] tracking-tighter italic leading-none drop-shadow-[0_0_60px_rgba(20,241,149,0.4)]">
+                    {winningPrize.toFixed(2)}
+                  </p>
+                  <span className="text-[#14F195] font-black text-2xl lg:text-5xl italic mt-auto mb-2 opacity-80">SOL</span>
+                </div>
+                <p className="text-white/20 text-[10px] mt-6 font-mono tracking-widest uppercase">Tx ID: confirmed_on_solana_network</p>
+              </div>
+
+              <div className="mt-16 flex flex-col items-center gap-6">
+                <button 
+                  onClick={() => setView('lobby')} 
+                  className="bg-white text-black px-24 py-7 rounded-2xl font-black text-2xl uppercase shadow-[0_0_80px_rgba(255,255,255,0.15)] hover:bg-[#14F195] hover:scale-110 active:scale-95 transition-all group relative overflow-hidden"
+                >
+                  <span className="relative z-10 group-hover:tracking-[0.2em] transition-all">START NEXT TOURNAMENT</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                </button>
+                <div className="flex items-center gap-4 text-white/40">
+                  <div className="h-[1px] w-8 bg-current opacity-20" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest italic">Winner stays on table #8831</p>
+                  <div className="h-[1px] w-8 bg-current opacity-20" />
+                </div>
+              </div>
+           </div>
         </div>
       )}
     </div>

@@ -42,3 +42,12 @@ export interface LeaderboardEntry {
   wins: number;
   totalWon: number;
 }
+
+export interface GameHistoryEntry {
+  id: string;
+  winner: string;
+  poolFee: number;
+  prize: number;
+  timeAgo: string;
+  playersCount: number;
+}

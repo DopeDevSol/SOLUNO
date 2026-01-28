@@ -22,23 +22,22 @@ const UnoCard: React.FC<UnoCardProps> = ({ card, onClick, disabled, isBack, size
     }
   };
 
-  // Optimized dimensions for 10-player visibility
   const dimensions = {
     sm: 'w-6 h-9 lg:w-10 lg:h-14',
     md: 'w-14 h-20 lg:w-24 lg:h-36', 
-    lg: 'w-20 h-28 lg:w-32 lg:h-44'
+    lg: 'w-24 h-36 lg:w-36 lg:h-52'
   };
 
   const getEffectClass = () => {
     if (!isSpecialEffect) return '';
     if (card.value === 'draw4') return 'animate-draw4-impact z-[100]';
-    return 'scale-125 brightness-125 z-50 transition-all duration-300'; 
+    return 'scale-110 brightness-125 z-50 transition-all duration-300 shadow-[0_0_30px_#fff]'; 
   };
 
   const baseClasses = `
-    ${dimensions[size]} border-[1.5px] lg:border-[4px] border-white rounded-md lg:rounded-[1.2rem] flex flex-col items-center justify-between 
-    shadow-[0_4px_12px_rgba(0,0,0,0.8)] relative transition-all flex-shrink-0 overflow-hidden select-none
-    ${disabled ? 'opacity-40 grayscale-[10%]' : 'cursor-pointer hover:brightness-110 active:scale-90 hover:shadow-[0_0_20px_rgba(20,241,149,0.3)]'}
+    ${dimensions[size]} border-[2px] lg:border-[5px] border-white rounded-md lg:rounded-[1.5rem] flex flex-col items-center justify-between 
+    shadow-[0_8px_16px_rgba(0,0,0,0.6)] relative transition-all flex-shrink-0 overflow-hidden select-none
+    ${disabled ? 'opacity-50 grayscale-[20%]' : 'cursor-pointer hover:-translate-y-1 hover:brightness-110 active:scale-95'}
     ${getEffectClass()}
   `;
 
@@ -60,12 +59,16 @@ const UnoCard: React.FC<UnoCardProps> = ({ card, onClick, disabled, isBack, size
       <button 
         onClick={onClick}
         disabled={disabled}
-        className={`${baseClasses} bg-[#0a0a0a] border-[#9945FF] justify-center p-0`}
+        className={`${baseClasses} bg-black border-white/20 p-0`}
       >
-        <div className="absolute inset-0.5 border border-[#14F195]/20 rounded-sm"></div>
-        <div className="absolute w-[180%] h-[75%] bg-gradient-to-br from-[#9945FF] to-[#14F195] rounded-[100%] rotate-[-25deg] flex items-center justify-center border lg:border-[6px] border-white shadow-xl">
-          <span className="font-bungee text-white italic tracking-tighter font-black text-[8px] lg:text-[3rem] drop-shadow-md">SOLUNO</span>
+        <div className="absolute inset-1 lg:inset-2 border border-[#14F195]/30 rounded-sm lg:rounded-xl"></div>
+        <div className="absolute w-[160%] h-[70%] bg-gradient-to-br from-[#9945FF] via-[#000] to-[#14F195] rounded-[100%] rotate-[-28deg] flex items-center justify-center border lg:border-[8px] border-white shadow-[0_10px_30px_rgba(0,0,0,0.8)] overflow-hidden">
+          <div className="rotate-[28deg] flex flex-col items-center">
+            <span className="font-bungee text-white italic tracking-tighter font-black text-[10px] lg:text-[2.2rem] leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">SOLUNO</span>
+            <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-white/40 to-transparent mt-1"></div>
+          </div>
         </div>
+        <div className="absolute inset-0 bg-black opacity-10 pointer-events-none"></div>
       </button>
     );
   }
@@ -74,16 +77,16 @@ const UnoCard: React.FC<UnoCardProps> = ({ card, onClick, disabled, isBack, size
     switch (card.value) {
       case 'draw4':
         return (
-          <div className="flex items-center justify-center gap-0.1 scale-[0.6] lg:scale-[1.1]">
-            <div className="w-4 h-6 lg:w-8 lg:h-12 bg-[#39b54a] border border-white/60 rounded-sm -rotate-12 shadow-lg"></div>
-            <div className="w-4 h-6 lg:w-8 lg:h-12 bg-[#0054a6] border border-white/60 rounded-sm -rotate-6 -ml-3 shadow-lg"></div>
-            <div className="w-4 h-6 lg:w-8 lg:h-12 bg-[#ed1c24] border border-white/60 rounded-sm rotate-6 -ml-3 shadow-lg"></div>
-            <div className="w-4 h-6 lg:w-8 lg:h-12 bg-[#fcee21] border border-white/60 rounded-sm rotate-12 -ml-3 shadow-lg"></div>
+          <div className="flex items-center justify-center gap-0.1 scale-[0.6] lg:scale-[1.25]">
+            <div className="w-4 h-6 lg:w-9 lg:h-14 bg-[#39b54a] border border-white rounded-sm -rotate-15 shadow-xl"></div>
+            <div className="w-4 h-6 lg:w-9 lg:h-14 bg-[#0054a6] border border-white rounded-sm -rotate-6 -ml-4 shadow-xl"></div>
+            <div className="w-4 h-6 lg:w-9 lg:h-14 bg-[#ed1c24] border border-white rounded-sm rotate-6 -ml-4 shadow-xl"></div>
+            <div className="w-4 h-6 lg:w-9 lg:h-14 bg-[#fcee21] border border-white rounded-sm rotate-15 -ml-4 shadow-xl"></div>
           </div>
         );
       case 'wild':
         return (
-          <div className="w-9 h-9 lg:w-20 lg:h-20 rounded-full overflow-hidden flex flex-wrap border-[2px] lg:border-[6px] border-white rotate-12 shadow-inner">
+          <div className="w-10 h-10 lg:w-24 lg:h-24 rounded-full overflow-hidden flex flex-wrap border-[3px] lg:border-[8px] border-white rotate-[30deg] shadow-2xl">
             <div className="w-1/2 h-1/2 bg-[#fcee21]"></div>
             <div className="w-1/2 h-1/2 bg-[#39b54a]"></div>
             <div className="w-1/2 h-1/2 bg-[#0054a6]"></div>
@@ -92,7 +95,7 @@ const UnoCard: React.FC<UnoCardProps> = ({ card, onClick, disabled, isBack, size
         );
       default:
         return (
-          <span className="font-bungee text-[1.8rem] lg:text-[5rem] font-black leading-none drop-shadow-md text-black">
+          <span className="font-bungee text-[2.5rem] lg:text-[7rem] font-black leading-none text-black drop-shadow-[0_2px_2px_rgba(255,255,255,0.4)]">
             {symbol}
           </span>
         );
@@ -106,17 +109,17 @@ const UnoCard: React.FC<UnoCardProps> = ({ card, onClick, disabled, isBack, size
       className={baseClasses}
       style={{ backgroundColor: getBgColor(card.color) }}
     >
-      <div className="absolute top-0.5 left-0.5 lg:top-1 lg:left-1 font-bungee font-black text-black text-[9px] lg:text-xl z-20">
+      <div className="absolute top-1 left-1 lg:top-2 lg:left-2 font-bungee font-black text-black text-[10px] lg:text-2xl z-20">
         {symbol}
       </div>
 
-      <div className="absolute inset-2 lg:inset-4 bg-white rounded-[100%] rotate-[-25deg] flex items-center justify-center border border-white/90 overflow-hidden shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]">
+      <div className="absolute inset-2 lg:inset-5 bg-white rounded-[100%] rotate-[-25deg] flex items-center justify-center border border-white/90 overflow-hidden shadow-[inset_0_4px_8px_rgba(0,0,0,0.4)]">
         <div className="rotate-[25deg] w-full h-full flex items-center justify-center">
           {renderCenterIcon()}
         </div>
       </div>
 
-      <div className="absolute bottom-0.5 right-0.5 lg:bottom-1 lg:right-1 font-bungee font-black text-black text-[9px] lg:text-xl rotate-180 z-20">
+      <div className="absolute bottom-1 right-1 lg:bottom-2 lg:right-2 font-bungee font-black text-black text-[10px] lg:text-2xl rotate-180 z-20">
         {symbol}
       </div>
     </button>
