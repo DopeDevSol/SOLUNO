@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { POOLS, HOUSE_FEE_PERCENT } from './constants';
 import { Card, GameState, Player, Pool, CardColor, LeaderboardEntry, GameHistoryEntry } from './types';
@@ -251,14 +252,14 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col felt-table overflow-hidden">
-      <nav className="flex-none px-4 py-2 flex justify-between items-center bg-black/80 backdrop-blur-3xl z-[150] border-b border-white/5">
+    <div className="h-[100dvh] flex flex-col felt-table overflow-y-auto no-scrollbar">
+      <nav className="flex-none px-4 py-2 flex justify-between items-center bg-black/80 backdrop-blur-3xl z-[150] border-b border-white/5 sticky top-0">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 bg-gradient-to-br from-[#9945FF] to-[#14F195] rounded flex items-center justify-center text-white font-black text-[10px]">S</div>
-          <h1 className="text-[10px] font-black italic text-white/80 tracking-tighter">SOLUNO ROYALE</h1>
+          <h1 className="text-[10px] font-black italic text-white/80 tracking-tighter uppercase">SOLUNO</h1>
         </div>
         <div className="flex gap-4 items-center">
-          <span className="text-[9px] font-black text-[#14F195] italic">SOL: ${solPrice?.toFixed(2)}</span>
+          <span className="text-[9px] font-black text-[#14F195] italic uppercase">SOL: ${solPrice?.toFixed(2)}</span>
           {!walletConnected ? (
              <button onClick={() => setWalletConnected(true)} className="bg-[#14F195] text-black px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all">CONNECT SEEKER</button>
           ) : (
@@ -270,12 +271,12 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="flex-1 relative overflow-hidden">
+      <main className="flex-1 relative">
         {view === 'lobby' && (
-          <div className="h-full flex flex-col items-center justify-center gap-6 p-4">
+          <div className="min-h-full flex flex-col items-center justify-center gap-6 p-4 py-12">
              <div className="text-center">
-                <div className="inline-block px-3 py-0.5 bg-[#9945FF]/20 border border-[#9945FF]/40 rounded-full text-[7px] text-[#9945FF] font-black tracking-[0.5em] mb-4">SEEKER EXCLUSIVE MATCHMAKING</div>
-                <h2 className="text-5xl lg:text-8xl font-black italic tracking-tighter text-white drop-shadow-2xl">SOLUNO Royale</h2>
+                <div className="inline-block px-3 py-0.5 bg-[#9945FF]/20 border border-[#9945FF]/40 rounded-full text-[7px] text-[#9945FF] font-black tracking-[0.5em] mb-4 uppercase">SEEKER EXCLUSIVE MATCHMAKING</div>
+                <h2 className="text-5xl lg:text-8xl font-black italic tracking-tighter text-white drop-shadow-2xl uppercase">SOLUNO</h2>
                 <p className="text-[#14F195] text-[10px] font-black tracking-[0.8em] mt-3 uppercase">Decentralized High Stakes</p>
              </div>
              
@@ -286,11 +287,11 @@ const App: React.FC = () => {
                 </div>
              ) : (
                <div className="flex flex-col items-center gap-8 w-full">
-                <div className="grid grid-cols-5 gap-4 max-w-5xl w-full px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 max-w-5xl w-full px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   {POOLS.map(p => (
                     <button key={p.id} onClick={() => enterPool(p)} className="bg-black/90 border border-white/10 p-6 rounded-[2rem] flex flex-col items-center hover:border-[#14F195] hover:scale-105 transition-all group active:scale-95 shadow-2xl relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-8 h-8 bg-[#14F195]/10 rounded-bl-3xl flex items-center justify-center">
-                        <span className="text-[7px] font-black text-[#14F195] italic">LIVE</span>
+                        <span className="text-[7px] font-black text-[#14F195] italic uppercase">LIVE</span>
                       </div>
                       <span className="text-4xl font-black text-[#14F195] italic leading-none">{p.entryFee}</span>
                       <span className="text-[8px] text-white/40 mt-2 uppercase tracking-widest font-bold">SOL BUY-IN</span>
@@ -298,7 +299,7 @@ const App: React.FC = () => {
                   ))}
                 </div>
                 
-                <div className="flex gap-4">
+                <div className="flex flex-wrap justify-center gap-4 px-6 pb-12">
                   <button 
                     onClick={() => setView('leaderboard')}
                     className="bg-black/60 border border-white/5 px-8 py-3 rounded-full flex items-center gap-3 hover:bg-white/5 transition-all group"
@@ -311,7 +312,7 @@ const App: React.FC = () => {
                     onClick={() => setView('history')}
                     className="bg-black/60 border border-white/5 px-8 py-3 rounded-full flex items-center gap-3 hover:bg-white/5 transition-all group"
                   >
-                    <span className="text-[10px] font-black text-white/40 tracking-[0.3em] uppercase group-hover:text-[#14F195] transition-colors">Live Royale Feed</span>
+                    <span className="text-[10px] font-black text-white/40 tracking-[0.3em] uppercase group-hover:text-[#14F195] transition-colors">Live SOLUNO Feed</span>
                     <div className="w-5 h-5 bg-white/5 rounded-full flex items-center justify-center text-[10px]">📡</div>
                   </button>
                 </div>
@@ -321,20 +322,20 @@ const App: React.FC = () => {
         )}
 
         {view === 'leaderboard' && (
-          <div className="h-full w-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-500">
+          <div className="min-h-full w-full flex flex-col items-center justify-center p-8 pb-16 animate-in fade-in zoom-in duration-500">
             <div className="max-w-4xl w-full flex flex-col items-center">
               <div className="text-center mb-10">
-                <div className="inline-block px-4 py-1 bg-[#14F195]/10 border border-[#14F195]/20 rounded-full text-[9px] text-[#14F195] font-black tracking-[0.4em] mb-4 uppercase">Royale Hall of Fame</div>
-                <h2 className="text-6xl font-black italic tracking-tighter text-white">THE ELITE MASTERS</h2>
+                <div className="inline-block px-4 py-1 bg-[#14F195]/10 border border-[#14F195]/20 rounded-full text-[9px] text-[#14F195] font-black tracking-[0.4em] mb-4 uppercase">SOLUNO Hall of Fame</div>
+                <h2 className="text-4xl lg:text-6xl font-black italic tracking-tighter text-white uppercase">THE ELITE MASTERS</h2>
                 <p className="text-white/30 text-[10px] tracking-[0.5em] mt-3 font-bold uppercase">Top earners across all brackets</p>
               </div>
 
               <div className="w-full bg-black/40 backdrop-blur-3xl border border-white/5 rounded-[3rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
                 <div className="grid grid-cols-4 px-10 py-6 border-b border-white/5 bg-white/5">
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">RANK</span>
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">MASTER</span>
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center">WINS</span>
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-right">TOTAL WON</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] uppercase">RANK</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] uppercase">MASTER</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center uppercase">WINS</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-right uppercase">TOTAL WON</span>
                 </div>
                 <div className="max-h-[50vh] overflow-y-auto no-scrollbar">
                   {MOCK_LEADERBOARD.map((entry, idx) => (
@@ -370,21 +371,21 @@ const App: React.FC = () => {
         )}
 
         {view === 'history' && (
-          <div className="h-full w-full flex flex-col items-center justify-center p-8 animate-in slide-in-from-right-10 duration-500">
+          <div className="min-h-full w-full flex flex-col items-center justify-center p-8 pb-16 animate-in slide-in-from-right-10 duration-500">
             <div className="max-w-4xl w-full flex flex-col items-center">
               <div className="text-center mb-8">
-                <div className="inline-block px-4 py-1 bg-[#14F195]/10 border border-[#14F195]/20 rounded-full text-[9px] text-[#14F195] font-black tracking-[0.4em] mb-4 uppercase">Live Royale Feed</div>
-                <h2 className="text-6xl font-black italic tracking-tighter text-white">RECENT CONQUESTS</h2>
+                <div className="inline-block px-4 py-1 bg-[#14F195]/10 border border-[#14F195]/20 rounded-full text-[9px] text-[#14F195] font-black tracking-[0.4em] mb-4 uppercase">Live SOLUNO Feed</div>
+                <h2 className="text-4xl lg:text-6xl font-black italic tracking-tighter text-white uppercase">RECENT CONQUESTS</h2>
                 <p className="text-white/30 text-[10px] tracking-[0.5em] mt-3 font-bold uppercase">Last 24 hours of total table domination</p>
               </div>
 
               <div className="w-full bg-black/40 backdrop-blur-3xl border border-white/5 rounded-[3rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
                 <div className="grid grid-cols-5 px-10 py-6 border-b border-white/5 bg-white/5">
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">TIME</span>
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em]">WINNER</span>
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center">TIER</span>
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center">TABLE</span>
-                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-right">PRIZE</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] uppercase">TIME</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] uppercase">WINNER</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center uppercase">TIER</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-center uppercase">TABLE</span>
+                  <span className="text-[9px] font-black text-white/20 tracking-[0.2em] text-right uppercase">PRIZE</span>
                 </div>
                 <div className="max-h-[55vh] overflow-y-auto no-scrollbar">
                   {MOCK_HISTORY.map((entry) => (
@@ -422,10 +423,10 @@ const App: React.FC = () => {
         )}
 
         {view === 'game' && (
-          <div className="w-full h-full relative">
+          <div className="w-full h-screen relative overflow-hidden">
             <div className={`direction-ring ${gameState.direction === 1 ? 'spin-cw' : 'spin-ccw'}`} />
             <div className="table-watermark-center"><div className="watermark-text">SOLUNO</div><div className="watermark-text mt-2" style={{ fontSize: '1.5vh' }}>TABLE PRO #8831</div></div>
-            <div className="absolute top-[5%] right-[2%] z-[60]"><div className="bg-black/95 backdrop-blur-2xl border border-white/10 px-4 py-2 rounded-xl max-w-[200px] shadow-2xl"><p className="text-[10px] font-bold text-[#14F195] leading-tight italic">"{commentary}"</p></div></div>
+            <div className="absolute top-[5%] right-[2%] z-[60]"><div className="bg-black/95 backdrop-blur-2xl border border-white/10 px-4 py-2 rounded-xl max-w-[200px] shadow-2xl"><p className="text-[10px] font-bold text-[#14F195] leading-tight italic uppercase">"{commentary}"</p></div></div>
             <div className="absolute inset-0 z-10">{gameState.players.map((p, i) => <PlayerSlot key={p.id} player={p} index={i} active={gameState.currentPlayerIndex === i} />)}</div>
             
             <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-20 lg:gap-40 z-30 scale-[0.7] lg:scale-100">
@@ -437,7 +438,7 @@ const App: React.FC = () => {
                      <div className="absolute top-0 left-0 rotate-[3deg] translate-x-0.5 -translate-y-0.5 opacity-80"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
                      <div className="relative z-10 transform transition-transform group-hover:translate-y-[-5px]"><UnoCard card={{} as any} isBack size="lg" disabled={gameState.currentPlayerIndex !== 0} /></div>
                   </div>
-                  <span className={`text-[10px] font-black tracking-[0.5em] transition-colors ${gameState.currentPlayerIndex === 0 ? 'text-[#14F195] animate-pulse' : 'text-white/20'}`}>DRAW DECK</span>
+                  <span className={`text-[10px] font-black tracking-[0.5em] transition-colors uppercase ${gameState.currentPlayerIndex === 0 ? 'text-[#14F195] animate-pulse' : 'text-white/20'}`}>DRAW DECK</span>
                </div>
 
                {/* Discard Pile */}
@@ -471,13 +472,13 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            <div className="absolute top-[12%] left-1/2 -translate-x-1/2 z-[40] bg-black/90 border border-[#14F195]/20 px-6 py-2 rounded-full shadow-2xl flex items-center gap-3"><div className="w-2 h-2 bg-[#14F195] rounded-full animate-pulse"></div><span className="text-xl font-black italic text-[#14F195] leading-none tracking-tighter">{winningPrize.toFixed(2)} SOL POT</span></div>
+            <div className="absolute top-[12%] left-1/2 -translate-x-1/2 z-[40] bg-black/90 border border-[#14F195]/20 px-6 py-2 rounded-full shadow-2xl flex items-center gap-3"><div className="w-2 h-2 bg-[#14F195] rounded-full animate-pulse"></div><span className="text-xl font-black italic text-[#14F195] leading-none tracking-tighter uppercase">{winningPrize.toFixed(2)} SOL POT</span></div>
             {dealingCardTarget && <div className="dealing-card-anim" style={{ '--tx': `${dealingCardTarget.x}vw`, '--ty': `${dealingCardTarget.y}vh` } as any}><div className="w-8 h-12 bg-[#111] border border-white/20 rounded-md"></div></div>}
             
             <div className="absolute bottom-[-10px] w-full z-[200] flex flex-col items-center hand-tray-bg pt-4 pb-6 overflow-visible">
               <div className="flex justify-between items-center w-full px-12 mb-3 pointer-events-none">
                 <button onClick={() => setView('lobby')} className="pointer-events-auto bg-white/5 border border-white/10 px-4 py-1.5 rounded-full text-[8px] font-black text-white/40 hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-widest">EXIT</button>
-                <div className={`pointer-events-auto px-10 py-2 rounded-full text-[11px] font-black italic border-2 transition-all flex items-center gap-4 ${gameState.currentPlayerIndex === 0 ? 'bg-[#14F195] border-[#14F195] text-black shadow-[0_0_40px_rgba(20,241,149,0.3)]' : 'bg-black/80 border-white/10 text-white/30'}`}>
+                <div className={`pointer-events-auto px-10 py-2 rounded-full text-[11px] font-black italic border-2 transition-all flex items-center gap-4 uppercase ${gameState.currentPlayerIndex === 0 ? 'bg-[#14F195] border-[#14F195] text-black shadow-[0_0_40px_rgba(20,241,149,0.3)]' : 'bg-black/80 border-white/10 text-white/30'}`}>
                   <span>{gameState.currentPlayerIndex === 0 ? "★ YOUR TURN ★" : `WAITING FOR ${gameState.players[gameState.currentPlayerIndex]?.name}...`}</span>
                   <span className={`w-8 h-8 rounded-full flex items-center justify-center border border-current font-bold ${turnTimeLeft < 5 ? 'animate-ping' : ''}`}>{turnTimeLeft}</span>
                 </div>
@@ -549,12 +550,12 @@ const App: React.FC = () => {
                   <p className="text-[#14F195] font-black text-8xl lg:text-[12rem] tracking-tighter italic leading-none drop-shadow-[0_0_60px_rgba(20,241,149,0.4)]">
                     {winningPrize.toFixed(2)}
                   </p>
-                  <span className="text-[#14F195] font-black text-2xl lg:text-5xl italic mt-auto mb-2 opacity-80">SOL</span>
+                  <span className="text-[#14F195] font-black text-2xl lg:text-5xl italic mt-auto mb-2 opacity-80 uppercase">SOL</span>
                 </div>
                 <p className="text-white/20 text-[10px] mt-6 font-mono tracking-widest uppercase">Tx ID: confirmed_on_solana_network</p>
               </div>
 
-              <div className="mt-16 flex flex-col items-center gap-6">
+              <div className="mt-16 flex flex-col items-center gap-6 pb-20">
                 <button 
                   onClick={() => setView('lobby')} 
                   className="bg-white text-black px-24 py-7 rounded-2xl font-black text-2xl uppercase shadow-[0_0_80px_rgba(255,255,255,0.15)] hover:bg-[#14F195] hover:scale-110 active:scale-95 transition-all group relative overflow-hidden"

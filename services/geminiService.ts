@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -11,7 +12,7 @@ const FALLBACK_HYPE = [
   "Solana speed, Solana stakes. Let's go!",
   "Is that a bluff or a winning hand?",
   "The pot is growing. Tension is peaking!",
-  "SOLUNO Royale: Where legends are minted.",
+  "SOLUNO: Where legends are minted.",
   "Don't let the bots outplay you!"
 ];
 
@@ -19,7 +20,7 @@ export const getGameCommentary = async (gameStateSummary: string): Promise<strin
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are a hype-man and strategic commentator for a high-stakes Solana card tournament called SOLUNO Royale. 
+      contents: `You are a hype-man and strategic commentator for a high-stakes Solana card tournament called SOLUNO. 
       Analyze this game state and provide a short, punchy, witty comment (max 15 words). 
       If there's nothing special, be encouraging.
       STATE: ${gameStateSummary}`,
@@ -36,7 +37,7 @@ export const askUnoAssistant = async (query: string, stateSummary: string): Prom
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are the Official SOLUNO Royale Referee. 
+      contents: `You are the Official SOLUNO Referee. 
       Help the player. (Max 30 words)
       STATE: ${stateSummary}
       Q: ${query}`,

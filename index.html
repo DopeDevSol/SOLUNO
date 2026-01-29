@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>SOLUNO Royale - Solana Mobile</title>
+  <title>SOLUNO - Solana Mobile</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
@@ -14,9 +15,10 @@
       background-color: #000000;
       color: #ffffff;
       margin: 0;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
       text-transform: uppercase;
-      overscroll-behavior: none;
+      overscroll-behavior: contain;
     }
     .font-bungee {
       font-family: 'Bungee', cursive;
@@ -27,6 +29,7 @@
       background: radial-gradient(circle at center, #1b4d2a 0%, #0a2412 70%, #051209 100%);
       position: relative;
       box-shadow: inset 0 0 150px rgba(0,0,0,0.9);
+      min-height: 100vh;
     }
     .felt-table::after {
       content: '';
