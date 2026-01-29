@@ -19,6 +19,7 @@
       overflow-y: auto;
       text-transform: uppercase;
       overscroll-behavior: contain;
+      perspective: 1200px;
     }
     .font-bungee {
       font-family: 'Bungee', cursive;
@@ -39,6 +40,32 @@
       opacity: 0.12;
       pointer-events: none;
       mix-blend-mode: overlay;
+    }
+
+    /* 3D Flying Card Styles */
+    .flying-card {
+      position: absolute;
+      width: 100px;
+      height: 150px;
+      pointer-events: none;
+      z-index: 5;
+      will-change: transform, opacity;
+      transition: transform 0.1s linear;
+    }
+
+    @keyframes card-deal-in {
+      0% { transform: translate(-50%, -50%) scale(0) rotate(720deg); opacity: 0; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(1) rotate(var(--tr)); opacity: 1; }
+    }
+
+    .scroll-deal {
+      opacity: 0;
+      transform: translateY(150px) rotateX(60deg) scale(0.5);
+      transition: all 1s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+    .scroll-deal.active {
+      opacity: 1;
+      transform: translateY(0) rotateX(0deg) scale(1);
     }
 
     /* Direction Indicator Rings */
@@ -180,6 +207,19 @@
     .hand-tray-bg {
       background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%);
       backdrop-filter: blur(12px);
+    }
+
+    @keyframes float-hero-card {
+      0%, 100% { transform: translateY(0) rotate(var(--rot)); }
+      50% { transform: translateY(-30px) rotate(calc(var(--rot) + 5deg)); }
+    }
+    .hero-card {
+      animation: float-hero-card 6s ease-in-out infinite;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+
+    .text-shadow-glow {
+      text-shadow: 0 0 20px rgba(153, 69, 255, 0.5), 0 0 40px rgba(20, 241, 149, 0.3);
     }
   </style>
 <script type="importmap">
