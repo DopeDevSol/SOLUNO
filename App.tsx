@@ -13,21 +13,16 @@ const MOCK_LEADERBOARD: LeaderboardEntry[] = [
   { rank: 3, address: "A3sK...8jLp", wins: 95, totalWon: 44.20 },
   { rank: 4, address: "B9qM...1vRb", wins: 82, totalWon: 31.80 },
   { rank: 5, address: "F2nH...5tYs", wins: 76, totalWon: 28.45 },
-  { rank: 6, address: "E4mJ...9vKn", wins: 64, totalWon: 22.10 },
-  { rank: 7, address: "K1pL...3xZq", wins: 51, totalWon: 18.50 },
-  { rank: 8, address: "R6tN...7mBc", wins: 42, totalWon: 12.30 },
 ];
 
 const MOCK_HISTORY: GameHistoryEntry[] = [
-  { id: "1", winner: "7xV1...9pQz", poolFee: 1.0, prize: 9.0, timeAgo: "2m ago", playersCount: 10 },
-  { id: "2", winner: "D8eW...2mNx", poolFee: 0.5, prize: 4.5, timeAgo: "5m ago", playersCount: 10 },
-  { id: "3", winner: "A3sK...8jLp", poolFee: 0.25, prize: 2.25, timeAgo: "12m ago", playersCount: 10 },
-  { id: "4", winner: "B9qM...1vRb", poolFee: 1.0, prize: 9.0, timeAgo: "18m ago", playersCount: 10 },
-  { id: "5", winner: "F2nH...5tYs", poolFee: 0.1, prize: 0.9, timeAgo: "24m ago", playersCount: 10 },
-  { id: "6", winner: "7xV1...9pQz", poolFee: 0.5, prize: 4.5, timeAgo: "31m ago", playersCount: 10 },
-  { id: "7", winner: "K1pL...3xZq", poolFee: 1.0, prize: 9.0, timeAgo: "45m ago", playersCount: 10 },
-  { id: "8", winner: "E4mJ...9vKn", poolFee: 0.05, prize: 0.45, timeAgo: "1h ago", playersCount: 10 },
+  { id: "1", winner: "7xV1...9pQz", poolFee: 1.0, prize: 9.0, timeAgo: "2m ago", playersCount: 6 },
+  { id: "2", winner: "D8eW...2mNx", poolFee: 0.5, prize: 4.5, timeAgo: "5m ago", playersCount: 4 },
+  { id: "3", winner: "A3sK...8jLp", poolFee: 0.25, prize: 2.25, timeAgo: "12m ago", playersCount: 5 },
 ];
+
+// Generate unique Round IDs for the lobby
+const LOBBY_ROUND_IDS = POOLS.map(() => Math.random().toString(16).slice(2, 6).toUpperCase());
 
 const App: React.FC = () => {
   const [solPrice, setSolPrice] = useState<number | null>(null);
@@ -100,7 +95,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (gameState.status === 'playing' && gameState.currentPlayerIndex !== 0 && !gameState.isGameOver) {
-      const botDelay = 1500 + Math.random() * 2000;
+      const botDelay = 1000 + Math.random() * 1500;
       const timeout = setTimeout(() => performBotMove(), botDelay);
       return () => clearTimeout(timeout);
     }
@@ -199,12 +194,12 @@ const App: React.FC = () => {
     drawFromDeckInternal(gameState.currentPlayerIndex);
   };
 
-  const startDealingAnimation = async () => {
+  const startDealingAnimation = async (playerCount: number) => {
     const deck = createDeck();
     setGameState(prev => ({ ...prev, deck }));
     for (let round = 0; round < 7; round++) {
-      for (let pIdx = 0; pIdx < 10; pIdx++) {
-        const angle = 90 + (pIdx * 36);
+      for (let pIdx = 0; pIdx < playerCount; pIdx++) {
+        const angle = 90 + (pIdx * (360 / playerCount));
         setDealingCardTarget({ x: 42 * Math.cos((angle * Math.PI) / 180), y: 32 * Math.sin((angle * Math.PI) / 180) });
         await new Promise(r => setTimeout(r, 40));
         setGameState(prev => {
@@ -226,33 +221,35 @@ const App: React.FC = () => {
   };
 
   const enterPool = (pool: Pool) => {
-    if (!walletConnected) {
+    if (!walletConnected && pool.entryFee > 0) {
       alert("Please connect your Seeker Wallet first!");
       return;
     }
+    const playerCount = Math.floor(Math.random() * 5) + 2; 
     const players: Player[] = [
       { id: 'me', name: 'YOU', hand: [], isLocal: true, avatarSeed: 88 },
-      ...Array.from({ length: 9 }).map((_, i) => ({ id: `b-${i}`, name: `BOT ${i+1}`, hand: [], isLocal: false, avatarSeed: Math.random() * 1000 }))
+      ...Array.from({ length: playerCount - 1 }).map((_, i) => ({ id: `b-${i}`, name: `BOT ${i+1}`, hand: [], isLocal: false, avatarSeed: Math.random() * 1000 }))
     ];
     setGameState({ deck: [], discardPile: [], players, currentPlayerIndex: 0, direction: 1, isGameOver: false, winner: null, status: 'shuffling', pool, lobbyCountdown: 0 });
     setView('game');
-    setTimeout(() => startDealingAnimation(), 1200);
+    setTimeout(() => startDealingAnimation(playerCount), 1200);
   };
 
-  const PlayerSlot: React.FC<{ player: Player; index: number; active: boolean }> = ({ player, index, active }) => {
+  const PlayerSlot: React.FC<{ player: Player; index: number; active: boolean; total: number }> = ({ player, index, active, total }) => {
     if (index === 0) return null;
-    const angle = 180 - ((index - 1) * (180 / 8)); 
+    const angleOffset = 180 / (total - 1);
+    const angle = 180 - ((index - 1) * angleOffset);
     const x = 50 + 46 * Math.cos((angle * Math.PI) / 180);
     const y = 42 - 34 * Math.sin((angle * Math.PI) / 180);
     return (
       <div className={`absolute flex flex-col items-center transition-all duration-700 ${active ? 'z-50 scale-125' : 'z-20 opacity-50 scale-90'}`} style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}>
-        <div className={`w-10 h-10 rounded-full border-2 overflow-hidden shadow-2xl transition-all duration-300 ${active ? 'border-[#14F195] bg-[#14F195]/20 shadow-[0_0_25px_#14F195]' : 'border-white/10 bg-black/40'}`}>
+        <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full border-2 overflow-hidden shadow-2xl transition-all duration-300 ${active ? 'border-[#14F195] bg-[#14F195]/20 shadow-[0_0_25px_#14F195]' : 'border-white/10 bg-black/40'}`}>
           <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${player.avatarSeed}`} alt="av" className="w-full h-full" />
         </div>
-        <div className={`mt-2 px-2 py-0.5 rounded text-[8px] font-black tracking-tighter ${active ? 'bg-[#14F195] text-black' : 'bg-black/80 text-white/50'}`}>
+        <div className={`mt-1 px-1.5 py-0.5 rounded text-[6px] lg:text-[7px] font-black tracking-tighter ${active ? 'bg-[#14F195] text-black' : 'bg-black/80 text-white/50'}`}>
           {player.name} • {player.hand.length}
         </div>
-        {active && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[7px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">{turnTimeLeft}</div>}
+        {active && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[6px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">{turnTimeLeft}</div>}
       </div>
     );
   };
@@ -276,47 +273,35 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col felt-table overflow-y-auto no-scrollbar scroll-smooth">
-      {/* Scroll-Interactive Throwing Cards */}
+      {/* Background Parallax Cards - Improved with UnoCard styling */}
       <div className="fixed inset-0 pointer-events-none z-[5] overflow-hidden">
-        {Array.from({ length: 8 }).map((_, i) => {
-          const speed = 0.4 + (i / 8) * 1.5;
-          const initialX = 5 + (i * 12);
-          const initialY = 15 + (i % 3) * 25;
+        {Array.from({ length: 6 }).map((_, i) => {
+          const speed = 0.3 + (i / 6) * 1.0;
+          const colors: CardColor[] = ['red', 'blue', 'green', 'yellow'];
           return (
-            <div 
-              key={i}
-              className="flying-card opacity-20 filter blur-[1px]"
-              style={{
-                left: `${initialX}%`,
-                top: `${initialY}%`,
-                transform: `
-                  translateY(${scrollPos * speed}px) 
-                  translateZ(${scrollPos * 0.1}px) 
-                  rotate(${scrollPos * 0.08 + i * 45}deg)
-                  scale(${1 + scrollPos * 0.0008 * speed})
-                `,
-                opacity: Math.max(0, 0.35 - (scrollPos * 0.0006))
-              }}
-            >
-              <div className={`w-full h-full rounded-xl border border-white/5 ${['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-400'][i % 4]}`}></div>
+            <div key={i} className="absolute opacity-10 filter blur-[0.5px]" style={{
+              left: `${5 + (i * 15)}%`, top: `${15 + (i % 3) * 25}%`,
+              transform: `translateY(${scrollPos * speed}px) rotate(${scrollPos * 0.05 + i * 45}deg) scale(${1 + scrollPos * 0.0004})`,
+              opacity: Math.max(0, 0.2 - (scrollPos * 0.0004))
+            }}>
+              <UnoCard card={{ id: `bg-${i}`, color: colors[i % 4], value: '7' }} size="md" disabled />
             </div>
           );
         })}
       </div>
 
-      <nav className="flex-none px-4 py-3 flex justify-between items-center bg-black/80 backdrop-blur-3xl z-[150] border-b border-white/5 sticky top-0 shadow-xl">
+      <nav className="flex-none px-4 py-2 flex justify-between items-center bg-black/80 backdrop-blur-3xl z-[150] border-b border-white/5 sticky top-0 shadow-xl">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-gradient-to-br from-[#9945FF] to-[#14F195] rounded-md flex items-center justify-center text-white font-black text-[12px]">S</div>
-          <h1 className="text-[12px] font-black italic text-white tracking-tighter uppercase">SOLUNO</h1>
+          <div className="w-5 h-5 bg-gradient-to-br from-[#9945FF] to-[#14F195] rounded-md flex items-center justify-center text-white font-black text-[10px]">S</div>
+          <h1 className="text-[10px] font-black italic text-white tracking-tighter uppercase">SOLUNO</h1>
         </div>
-        <div className="flex gap-4 items-center">
-          <span className="text-[10px] font-black text-[#14F195] italic uppercase">SOL: ${solPrice?.toFixed(2)}</span>
+        <div className="flex gap-3 items-center">
+          <span className="text-[8px] lg:text-[9px] font-black text-[#14F195] italic uppercase">SOL: ${solPrice?.toFixed(2)}</span>
           {!walletConnected ? (
-             <button onClick={() => setWalletConnected(true)} className="bg-[#14F195] text-black px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:brightness-110 shadow-[0_0_15px_rgba(20,241,149,0.2)]">CONNECT</button>
+             <button onClick={() => setWalletConnected(true)} className="bg-[#14F195] text-black px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest shadow-lg">CONNECT</button>
           ) : (
-             <div className="bg-[#14F195]/10 px-3 py-1.5 rounded-lg border border-[#14F195]/20 text-[10px] font-mono text-[#14F195] flex items-center gap-2">
-               <div className="w-1.5 h-1.5 bg-[#14F195] rounded-full animate-pulse shadow-glow"></div>
-               8.80 SOL
+             <div className="bg-[#14F195]/10 px-2 py-1 rounded-md border border-[#14F195]/20 text-[8px] font-mono text-[#14F195] flex items-center gap-1.5">
+               <div className="w-1 h-1 bg-[#14F195] rounded-full animate-pulse shadow-glow"></div>8.80 SOL
              </div>
           )}
         </div>
@@ -324,166 +309,148 @@ const App: React.FC = () => {
 
       <main className="flex-1 relative z-10">
         {view === 'lobby' && (
-          <div className="min-h-full flex flex-col items-center gap-12 p-4 py-16 lg:py-32 overflow-visible">
-             <div className="text-center sticky top-24 z-20 pointer-events-none transition-transform duration-300" 
-                  style={{ transform: `scale(${Math.max(0.6, 1 - scrollPos/1000)}) translateY(${-scrollPos * 0.12}px)` }}>
-                <h2 className="text-6xl lg:text-[10rem] font-black italic tracking-tighter text-white drop-shadow-2xl uppercase leading-none select-none text-shadow-glow">SOLUNO</h2>
-                <div className="mt-6 text-[#9945FF] text-[14px] lg:text-[24px] font-black tracking-[0.4em] uppercase opacity-90 drop-shadow-glow">Solana UNO Version - Seeker Exclusive</div>
+          <div className="min-h-full flex flex-col items-center gap-8 p-4 py-10 lg:py-20 overflow-visible">
+             <div className="text-center sticky top-20 z-20 pointer-events-none transition-transform duration-300" 
+                  style={{ transform: `scale(${Math.max(0.7, 1 - scrollPos/1000)}) translateY(${-scrollPos * 0.08}px)` }}>
+                <h2 className="text-5xl lg:text-9xl font-black italic tracking-tighter text-white drop-shadow-2xl uppercase select-none text-shadow-glow leading-none">SOLUNO</h2>
+                <div className="mt-3 text-[#9945FF] text-[10px] lg:text-[18px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA UNO VERSION - SEEKER EXCLUSIVE</div>
                 
-                {/* Visual Aids around title - smaller on mobile */}
-                <div className="absolute -top-10 -left-12 rotate-[-12deg] hero-card opacity-40 scale-50 lg:scale-100" style={{ '--rot': '-12deg' } as any}><UnoCard card={{id: '1', color: 'red', value: '7'}} size="lg" disabled /></div>
-                <div className="absolute -top-10 -right-12 rotate-[12deg] hero-card opacity-40 scale-50 lg:scale-100" style={{ '--rot': '12deg' } as any}><UnoCard card={{id: '2', color: 'blue', value: 'draw4'}} size="lg" disabled /></div>
+                {/* Floating visual cards beside title - Using UnoCard */}
+                <div className="absolute -top-12 -left-16 rotate-[-15deg] hidden lg:block opacity-60">
+                  <UnoCard card={{ id: 'hero-1', color: 'red', value: 'draw4' }} size="lg" disabled />
+                </div>
+                <div className="absolute -top-12 -right-16 rotate-[15deg] hidden lg:block opacity-60">
+                  <UnoCard card={{ id: 'hero-2', color: 'blue', value: 'wild' }} size="lg" disabled />
+                </div>
              </div>
              
-             <div className="w-full flex flex-col items-center gap-16 relative z-30">
+             <div className="w-full flex flex-col items-center gap-8 relative z-30">
                {!walletConnected ? (
-                  <div className="mt-4 text-center bg-black/60 p-10 rounded-[3rem] border border-white/5 backdrop-blur-3xl shadow-2xl scroll-deal max-w-sm w-full">
-                     <p className="text-white/40 text-[11px] font-bold uppercase tracking-widest mb-6">Authorize via Seed Vault</p>
-                     <button onClick={() => setWalletConnected(true)} className="bg-white text-black px-12 py-4 rounded-xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] uppercase">LINK SEEKER WALLET</button>
+                  <div className="text-center bg-black/60 p-6 rounded-[2rem] border border-white/5 backdrop-blur-3xl shadow-2xl scroll-deal max-w-sm w-full">
+                     <p className="text-white/40 text-[9px] font-bold uppercase tracking-widest mb-4">Authorize Seed Vault</p>
+                     <button onClick={() => setWalletConnected(true)} className="bg-white text-black px-8 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest">LINK SEEKER</button>
                   </div>
                ) : (
-                 <div className="flex flex-col items-center gap-16 w-full max-w-6xl">
-                    <div className="flex flex-col items-center gap-8 w-full">
-                       <div className="flex items-center gap-3 w-full max-w-md">
-                         <div className="h-[1px] flex-1 bg-white/5" />
-                         <span className="text-white/20 text-[10px] font-black tracking-[0.4em] uppercase whitespace-nowrap">Choose Your Table</span>
-                         <div className="h-[1px] flex-1 bg-white/5" />
-                       </div>
-                       
-                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full px-4">
+                 <div className="flex flex-col items-center gap-8 w-full max-w-5xl">
+                    <div className="flex flex-col items-center gap-4 w-full">
+                       <span className="text-white/20 text-[7px] font-black tracking-[0.3em] uppercase">VERIFIED ON SOLSCAN</span>
+                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 w-full px-2 lg:px-6">
                         {POOLS.map((p, idx) => (
-                          <div key={p.id} className="scroll-deal" style={{ transitionDelay: `${idx * 80}ms` }}>
+                          <div key={p.id} className="scroll-deal" style={{ transitionDelay: `${idx * 40}ms` }}>
                             <button 
                               onClick={() => enterPool(p)} 
-                              className="w-full bg-black/90 border border-white/5 p-6 rounded-[2rem] flex flex-col items-center hover:border-[#14F195] hover:scale-105 transition-all group active:scale-95 shadow-xl relative overflow-hidden neon-card"
+                              className="w-full bg-black/95 border border-white/5 p-3.5 lg:p-5 rounded-2xl flex flex-col items-center hover:border-[#14F195] hover:scale-105 transition-all group active:scale-95 shadow-lg relative overflow-hidden neon-card"
                             >
-                              <div className="absolute top-0 right-0 w-8 h-8 bg-[#14F195]/10 rounded-bl-[1.5rem] flex items-center justify-center">
-                                <span className="text-[7px] font-black text-[#14F195] italic uppercase tracking-tighter">LIVE</span>
+                              <div className="absolute top-0 right-0 px-1.5 py-0.5 bg-[#14F195]/10 rounded-bl-lg flex items-center justify-center">
+                                <span className="text-[5px] font-black text-[#14F195] uppercase tracking-tighter">VERIFIED</span>
                               </div>
-                              <span className="text-4xl font-black text-[#14F195] italic leading-none group-hover:scale-110 transition-transform">{p.entryFee}</span>
-                              <span className="text-[9px] text-white/40 mt-2 uppercase tracking-widest font-bold">SOL BUY-IN</span>
+                              <span className="text-2xl font-black text-[#14F195] italic leading-none">{p.entryFee > 0 ? p.entryFee : 'FREE'}</span>
+                              <span className="text-[6px] text-white/40 mt-1 uppercase tracking-widest font-bold">{p.entryFee > 0 ? 'SOL' : 'FOR ALL'}</span>
+                              <div className="mt-2.5 flex flex-col items-center gap-0.5">
+                                 <span className="text-[6px] text-[#9945FF] font-black italic uppercase">Round #{LOBBY_ROUND_IDS[idx]}</span>
+                                 <span className="text-[5px] text-white/20 font-bold uppercase tracking-widest">{Math.floor(Math.random() * 5) + 2}/6 Playing</span>
+                              </div>
+                              <div className="mt-2 text-[5px] text-white/10 uppercase font-black">solscan.io/tx/soluno_{LOBBY_ROUND_IDS[idx].toLowerCase()}</div>
                             </button>
                           </div>
                         ))}
                       </div>
                     </div>
                     
-                    <div className="flex flex-wrap justify-center gap-4 px-4 pb-12">
-                      <button 
-                        onClick={() => setView('leaderboard')}
-                        className="bg-black/60 border border-white/5 px-6 py-3 rounded-2xl flex items-center gap-3 hover:bg-white/5 transition-all group shadow-lg scroll-deal"
-                      >
-                        <span className="text-[10px] font-black text-white/50 tracking-[0.2em] uppercase group-hover:text-[#14F195]">Hall of Fame</span>
-                        <div className="w-6 h-6 bg-gradient-to-r from-[#9945FF] to-[#14F195] rounded-full flex items-center justify-center text-[10px]">🏆</div>
+                    <div className="flex flex-wrap justify-center gap-3 px-4 pb-4">
+                      <button onClick={() => setView('leaderboard')} className="bg-black/60 border border-white/5 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-white/5 transition-all shadow-md scroll-deal">
+                        <span className="text-[8px] font-black text-white/50 tracking-[0.1em] uppercase">Masters</span>
+                        <div className="w-4 h-4 bg-gradient-to-r from-[#9945FF] to-[#14F195] rounded-full flex items-center justify-center text-[8px]">🏆</div>
                       </button>
-
-                      <button 
-                        onClick={() => setView('history')}
-                        className="bg-black/60 border border-white/5 px-6 py-3 rounded-2xl flex items-center gap-3 hover:bg-white/5 transition-all group shadow-lg scroll-deal"
-                        style={{ transitionDelay: '100ms' }}
-                      >
-                        <span className="text-[10px] font-black text-white/50 tracking-[0.2em] uppercase group-hover:text-[#14F195]">Live Feed</span>
-                        <div className="w-6 h-6 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-[10px]">📡</div>
+                      <button onClick={() => setView('history')} className="bg-black/60 border border-white/5 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-white/5 transition-all shadow-md scroll-deal">
+                        <span className="text-[8px] font-black text-white/50 tracking-[0.1em] uppercase">History</span>
+                        <div className="w-4 h-4 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-[8px]">📡</div>
                       </button>
                     </div>
                  </div>
                )}
              </div>
 
-             <div className="mt-8 py-8 text-center opacity-20 border-t border-white/5 w-full max-w-md">
-               <p className="text-[9px] font-black tracking-[1em] uppercase text-white/60">Built for Seeker • Soluno v2.5</p>
+             <div className="mt-4 py-4 text-center opacity-15 border-t border-white/5 w-full max-w-xs">
+               <p className="text-[7px] font-black tracking-[0.6em] uppercase text-white/60">Verifiable on Solscan • v2.5</p>
              </div>
           </div>
         )}
 
-        {/* Other views (leaderboard/history) adjusted for smaller screens */}
         {view === 'leaderboard' && (
-          <div className="min-h-full w-full flex flex-col items-center justify-center p-4 pb-20 animate-in fade-in zoom-in duration-500">
-            <div className="max-w-2xl w-full flex flex-col items-center">
-              <div className="text-center mb-8">
-                <h2 className="text-4xl lg:text-[5rem] font-black italic tracking-tighter text-white uppercase leading-none">MASTERS</h2>
-                <p className="text-white/30 text-[9px] tracking-[0.5em] mt-3 font-bold uppercase">Top earners on the chain</p>
+          <div className="min-h-full w-full flex flex-col items-center justify-center p-4 pb-12 animate-in fade-in zoom-in duration-500">
+            <h2 className="text-2xl font-black italic text-white uppercase mb-4">LEADERBOARD</h2>
+            <div className="w-full max-w-lg bg-black/60 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="grid grid-cols-3 px-5 py-2.5 border-b border-white/10 bg-white/5">
+                <span className="text-[7px] font-black text-white/20 uppercase">RANK / ADDRESS</span>
+                <span className="text-[7px] font-black text-white/20 uppercase text-center">WINS</span>
+                <span className="text-[7px] font-black text-white/20 uppercase text-right">TOTAL</span>
               </div>
-
-              <div className="w-full bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
-                <div className="grid grid-cols-4 px-6 py-4 border-b border-white/10 bg-white/5">
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">RANK</span>
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">MASTER</span>
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest text-center">WINS</span>
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest text-right">WON</span>
-                </div>
-                <div className="max-h-[45vh] overflow-y-auto no-scrollbar">
-                  {MOCK_LEADERBOARD.map((entry) => (
-                    <div key={entry.address} className="grid grid-cols-4 px-6 py-4 border-b border-white/5 items-center hover:bg-white/5">
-                      <span className={`text-lg font-black italic ${entry.rank <= 3 ? 'text-[#14F195]' : 'text-white/20'}`}>#{entry.rank}</span>
-                      <span className="font-mono text-[10px] text-white/60 truncate mr-2">{entry.address}</span>
-                      <span className="text-sm font-black text-white text-center italic">{entry.wins}</span>
-                      <span className="text-sm font-black text-[#14F195] italic text-right">{entry.totalWon.toFixed(1)} SOL</span>
+              <div className="max-h-[35vh] overflow-y-auto no-scrollbar">
+                {MOCK_LEADERBOARD.map((entry) => (
+                  <div key={entry.address} className="grid grid-cols-3 px-5 py-2.5 border-b border-white/5 items-center">
+                    <div className="flex items-center gap-1.5 truncate">
+                       <span className={`text-xs font-black italic ${entry.rank <= 3 ? 'text-[#14F195]' : 'text-white/20'}`}>#{entry.rank}</span>
+                       <span className="font-mono text-[8px] text-white/60 truncate">{entry.address}</span>
                     </div>
-                  ))}
-                </div>
+                    <span className="text-[10px] font-black text-white text-center">{entry.wins}</span>
+                    <span className="text-[10px] font-black text-[#14F195] italic text-right">{entry.totalWon.toFixed(1)} S</span>
+                  </div>
+                ))}
               </div>
-              <button onClick={() => setView('lobby')} className="mt-8 bg-white text-black px-12 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest">BACK</button>
             </div>
+            <button onClick={() => setView('lobby')} className="mt-5 bg-white text-black px-8 py-2 rounded-md font-black text-[9px] uppercase tracking-widest">BACK</button>
           </div>
         )}
 
         {view === 'history' && (
-          <div className="min-h-full w-full flex flex-col items-center justify-center p-4 pb-20 animate-in slide-in-from-right-10 duration-500">
-            <div className="max-w-3xl w-full flex flex-col items-center">
-              <div className="text-center mb-6">
-                <h2 className="text-4xl lg:text-[5rem] font-black italic tracking-tighter text-white uppercase leading-none">ACTIVITY</h2>
-                <p className="text-white/30 text-[9px] tracking-[0.5em] mt-3 font-bold uppercase">Recent table payouts</p>
+          <div className="min-h-full w-full flex flex-col items-center justify-center p-4 pb-12 animate-in slide-in-from-right-10 duration-500">
+            <h2 className="text-2xl font-black italic text-white uppercase mb-4">TABLE HISTORY</h2>
+            <div className="w-full max-w-lg bg-black/60 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="grid grid-cols-4 px-5 py-2.5 border-b border-white/10 bg-white/5">
+                <span className="text-[7px] font-black text-white/20 uppercase">TIME</span>
+                <span className="text-[7px] font-black text-white/20 uppercase">WINNER</span>
+                <span className="text-[7px] font-black text-white/20 uppercase text-center">SIZE</span>
+                <span className="text-[7px] font-black text-white/20 uppercase text-right">PRIZE</span>
               </div>
-
-              <div className="w-full bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
-                <div className="grid grid-cols-4 px-6 py-4 border-b border-white/10 bg-white/5">
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">TIME</span>
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">WINNER</span>
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest text-center">TABLE</span>
-                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest text-right">PRIZE</span>
-                </div>
-                <div className="max-h-[50vh] overflow-y-auto no-scrollbar">
-                  {MOCK_HISTORY.map((entry) => (
-                    <div key={entry.id} className="grid grid-cols-4 px-6 py-4 border-b border-white/5 items-center hover:bg-white/5">
-                      <span className="text-[9px] font-bold text-white/40 uppercase">{entry.timeAgo}</span>
-                      <span className="font-mono text-[10px] text-white/60 truncate mr-2">{entry.winner}</span>
-                      <span className="text-[9px] font-black text-white/30 text-center uppercase">{entry.playersCount} P</span>
-                      <span className="text-sm font-black text-[#14F195] italic text-right">+{entry.prize.toFixed(1)} SOL</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="max-h-[40vh] overflow-y-auto no-scrollbar">
+                {MOCK_HISTORY.map((entry) => (
+                  <div key={entry.id} className="grid grid-cols-4 px-5 py-2.5 border-b border-white/5 items-center hover:bg-white/5">
+                    <span className="text-[7px] font-bold text-white/40 uppercase">{entry.timeAgo}</span>
+                    <span className="font-mono text-[8px] text-white/60 truncate">{entry.winner}</span>
+                    <span className="text-[7px] font-black text-white/30 text-center">{entry.playersCount}P</span>
+                    <span className="text-[10px] font-black text-[#14F195] italic text-right">+{entry.prize.toFixed(1)}</span>
+                  </div>
+                ))}
               </div>
-              <button onClick={() => setView('lobby')} className="mt-8 bg-white text-black px-12 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest">BACK</button>
             </div>
+            <button onClick={() => setView('lobby')} className="mt-5 bg-white text-black px-8 py-2 rounded-md font-black text-[9px] uppercase tracking-widest">BACK</button>
           </div>
         )}
 
         {view === 'game' && (
           <div className="w-full h-screen relative overflow-hidden">
             <div className={`direction-ring ${gameState.direction === 1 ? 'spin-cw' : 'spin-ccw'}`} />
-            <div className="table-watermark-center"><div className="watermark-text">SOLUNO</div><div className="watermark-text mt-2" style={{ fontSize: '1.5vh' }}>PRO TABLE</div></div>
-            <div className="absolute top-[5%] right-[2%] z-[60]"><div className="bg-black/95 backdrop-blur-2xl border border-white/10 px-3 py-1.5 rounded-lg max-w-[150px] shadow-2xl"><p className="text-[9px] font-bold text-[#14F195] leading-tight italic uppercase">"{commentary}"</p></div></div>
-            <div className="absolute inset-0 z-10">{gameState.players.map((p, i) => <PlayerSlot key={p.id} player={p} index={i} active={gameState.currentPlayerIndex === i} />)}</div>
+            <div className="table-watermark-center"><div className="watermark-text">SOLUNO</div><div className="watermark-text mt-1.5" style={{ fontSize: '1vh' }}>PRO TABLE</div></div>
+            <div className="absolute top-[4%] right-[2%] z-[60]"><div className="bg-black/95 backdrop-blur-2xl border border-white/10 px-2 py-1 rounded-lg max-w-[120px] shadow-2xl"><p className="text-[7px] font-bold text-[#14F195] leading-tight italic uppercase">"{commentary}"</p></div></div>
+            <div className="absolute inset-0 z-10">{gameState.players.map((p, i) => <PlayerSlot key={p.id} player={p} index={i} active={gameState.currentPlayerIndex === i} total={gameState.players.length} />)}</div>
             
-            <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-12 lg:gap-32 z-30 scale-[0.6] lg:scale-100">
-               <div className="flex flex-col items-center gap-2 group" onClick={drawFromDeck}>
-                  <div className="relative cursor-pointer">
+            <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-10 lg:gap-32 z-30 scale-[0.5] lg:scale-100">
+               <div className="flex flex-col items-center gap-1.5 group" onClick={drawFromDeck}>
+                  <div className="relative cursor-pointer transition-transform hover:scale-105 active:scale-95">
                      <div className="absolute top-0 left-0 rotate-[2deg] translate-x-1 translate-y-1 opacity-40"><UnoCard card={{} as any} isBack size="lg" disabled /></div>
                      <div className="relative z-10"><UnoCard card={{} as any} isBack size="lg" disabled={gameState.currentPlayerIndex !== 0} /></div>
                   </div>
-                  <span className={`text-[8px] font-black tracking-widest transition-colors uppercase ${gameState.currentPlayerIndex === 0 ? 'text-[#14F195] animate-pulse' : 'text-white/20'}`}>DRAW</span>
+                  <span className={`text-[6px] font-black tracking-widest transition-colors uppercase ${gameState.currentPlayerIndex === 0 ? 'text-[#14F195] animate-pulse' : 'text-white/20'}`}>DRAW</span>
                </div>
 
-               <div className="flex flex-col items-center gap-2">
+               <div className="flex flex-col items-center gap-1.5">
                   <div className="relative w-24 h-36 flex items-center justify-center">
                     <div className="absolute -inset-6 pointer-events-none">
                       <svg className="w-full h-full rotate-[-90deg]">
                         <circle cx="50%" cy="50%" r="46%" 
                           stroke={turnTimeLeft < 5 ? '#ef4444' : '#14F195'} 
-                          strokeWidth="4" 
-                          fill="transparent" 
-                          strokeDasharray="300" 
+                          strokeWidth="4" fill="transparent" strokeDasharray="300" 
                           strokeDashoffset={300 - (300 * (turnTimeLeft / MAX_TURN_TIME))} 
                           strokeLinecap="round"
                         />
@@ -495,32 +462,32 @@ const App: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  <span className="text-[8px] font-black text-[#14F195] tracking-widest uppercase">ACTIVE</span>
+                  <span className="text-[6px] font-black text-[#14F195] tracking-widest uppercase">ACTIVE</span>
                </div>
             </div>
 
-            <div className="absolute top-[12%] left-1/2 -translate-x-1/2 z-[40] bg-black/90 border border-[#14F195]/20 px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2"><div className="w-1.5 h-1.5 bg-[#14F195] rounded-full animate-pulse"></div><span className="text-sm font-black italic text-[#14F195] tracking-tight uppercase">{winningPrize.toFixed(1)} SOL POT</span></div>
-            {dealingCardTarget && <div className="dealing-card-anim" style={{ '--tx': `${dealingCardTarget.x}vw`, '--ty': `${dealingCardTarget.y}vh` } as any}><div className="w-6 h-10 bg-[#111] border border-white/10 rounded-sm"></div></div>}
+            <div className="absolute top-[10%] left-1/2 -translate-x-1/2 z-[40] bg-black/90 border border-[#14F195]/20 px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5"><div className="w-1 h-1 bg-[#14F195] rounded-full animate-pulse"></div><span className="text-[10px] font-black italic text-[#14F195] tracking-tight uppercase">{winningPrize > 0 ? winningPrize.toFixed(1) + ' SOL POT' : 'FOR HONOR'}</span></div>
+            {dealingCardTarget && <div className="dealing-card-anim" style={{ '--tx': `${dealingCardTarget.x}vw`, '--ty': `${dealingCardTarget.y}vh` } as any}><div className="w-5 h-8 bg-[#111] border border-white/10 rounded-sm"></div></div>}
             
-            <div className="absolute bottom-[-10px] w-full z-[200] flex flex-col items-center hand-tray-bg pt-4 pb-6 overflow-visible">
-              <div className="flex justify-between items-center w-full px-8 mb-2 pointer-events-none">
-                <button onClick={() => setView('lobby')} className="pointer-events-auto bg-white/5 border border-white/10 px-3 py-1 rounded-full text-[8px] font-black text-white/30 uppercase tracking-widest">EXIT</button>
-                <div className={`pointer-events-auto px-6 py-1.5 rounded-full text-[10px] font-black italic border transition-all flex items-center gap-3 uppercase ${gameState.currentPlayerIndex === 0 ? 'bg-[#14F195] border-[#14F195] text-black shadow-glow' : 'bg-black/80 border-white/10 text-white/30'}`}>
-                  <span>{gameState.currentPlayerIndex === 0 ? "★ YOUR TURN ★" : `WAITING...`}</span>
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center border border-current font-bold ${turnTimeLeft < 5 ? 'animate-ping' : ''}`}>{turnTimeLeft}</span>
+            <div className="absolute bottom-[-10px] w-full z-[200] flex flex-col items-center hand-tray-bg pt-4 pb-5 overflow-visible">
+              <div className="flex justify-between items-center w-full px-6 mb-1.5 pointer-events-none">
+                <button onClick={() => setView('lobby')} className="pointer-events-auto bg-white/5 border border-white/10 px-2.5 py-1 rounded-full text-[6px] font-black text-white/30 uppercase tracking-widest hover:text-red-500 transition-colors">EXIT</button>
+                <div className={`pointer-events-auto px-5 py-1.5 rounded-full text-[8px] font-black italic border transition-all flex items-center gap-2 uppercase ${gameState.currentPlayerIndex === 0 ? 'bg-[#14F195] border-[#14F195] text-black shadow-glow' : 'bg-black/80 border-white/10 text-white/30'}`}>
+                  <span>{gameState.currentPlayerIndex === 0 ? "★ TURN ★" : `WAITING...`}</span>
+                  <span className={`w-4 h-4 rounded-full flex items-center justify-center border border-current font-bold ${turnTimeLeft < 5 ? 'animate-ping' : ''}`}>{turnTimeLeft}</span>
                 </div>
-                <div className="w-[50px]"></div>
+                <div className="w-[40px]"></div>
               </div>
-              <div className="relative pointer-events-auto w-full flex justify-center h-[100px] lg:h-[180px] overflow-visible">
+              <div className="relative pointer-events-auto w-full flex justify-center h-[80px] lg:h-[180px] overflow-visible">
                 {sortedHand.map((c, idx) => {
                   const total = sortedHand.length;
                   const middle = (total - 1) / 2;
                   const offset = idx - middle;
-                  const rotation = offset * (total > 8 ? 3 : 5);
-                  const xShift = offset * (total > 8 ? 20 : 35);
-                  const yShift = Math.abs(offset) * 1.5;
+                  const rotation = offset * (total > 8 ? 2.5 : 4);
+                  const xShift = offset * (total > 8 ? 16 : 28);
+                  const yShift = Math.abs(offset) * 1;
                   return (
-                    <div key={c.id} className="absolute transition-all duration-300 hover:-translate-y-16 transform-gpu" style={{ zIndex: 10 + idx, transform: `translateX(${xShift}px) translateY(${yShift}px) rotate(${rotation}deg)`, transformOrigin: 'bottom center' }}>
+                    <div key={c.id} className="absolute transition-all duration-300 hover:-translate-y-10 transform-gpu" style={{ zIndex: 10 + idx, transform: `translateX(${xShift}px) translateY(${yShift}px) rotate(${rotation}deg)`, transformOrigin: 'bottom center' }}>
                       <UnoCard card={c} size="md" onClick={() => playCard(c)} disabled={gameState.currentPlayerIndex !== 0} />
                     </div>
                   );
@@ -531,16 +498,16 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Simplified Game Over for mobile flow */}
       {gameState.isGameOver && (
         <div className="fixed inset-0 z-[300] bg-black/98 flex flex-col items-center justify-center text-center p-6 animate-in zoom-in duration-500 overflow-hidden">
-           <div className="text-[8rem] lg:text-[14rem] mb-4 winner-cup-animation drop-shadow-glow">🏆</div>
-           <h3 className="text-4xl lg:text-[6rem] font-black italic tracking-tighter text-white mb-8 uppercase leading-none">WINNER!</h3>
-           <div className="bg-white/5 border border-white/10 p-10 rounded-[3rem] shadow-2xl mb-12">
-              <p className="text-[#14F195] font-black text-6xl lg:text-9xl leading-none">{winningPrize.toFixed(1)}</p>
-              <p className="text-[#14F195]/60 text-lg font-black mt-2">SOL WON</p>
+           <div className="text-[5rem] lg:text-[10rem] mb-3 winner-cup-animation drop-shadow-glow">🏆</div>
+           <h3 className="text-3xl lg:text-[4rem] font-black italic tracking-tighter text-white mb-6 uppercase leading-none">{gameState.winner === 'YOU' ? 'VICTORY' : 'DEFEAT'}</h3>
+           <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] shadow-2xl mb-8 flex flex-col items-center">
+              <p className="text-[#14F195] font-black text-4xl lg:text-7xl leading-none">{winningPrize > 0 ? winningPrize.toFixed(1) : 'GOAT'}</p>
+              <p className="text-[#14F195]/60 text-[10px] font-black mt-2 uppercase">{winningPrize > 0 ? 'SOL CLAIMED' : 'HONOR EARNED'}</p>
+              <div className="mt-4 text-[8px] text-white/20 font-mono tracking-tighter uppercase">tx: solscan.io/tx/soluno_final_{Math.random().toString(16).slice(2,8)}</div>
            </div>
-           <button onClick={() => setView('lobby')} className="bg-white text-black px-12 py-5 rounded-xl font-black text-xl shadow-2xl uppercase">LOBBY</button>
+           <button onClick={() => setView('lobby')} className="bg-white text-black px-10 py-3 rounded-lg font-black text-xs shadow-2xl uppercase tracking-widest">CONTINUE</button>
         </div>
       )}
     </div>

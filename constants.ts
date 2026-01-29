@@ -1,6 +1,7 @@
 import { Pool } from './types';
 
 export const POOLS: Pool[] = [
+  { id: 0, entryFee: 0, minUno: 0 }, // Free Play table
   { id: 1, entryFee: 0.05, minUno: 1000 },
   { id: 2, entryFee: 0.1, minUno: 1000 },
   { id: 3, entryFee: 0.25, minUno: 5000 },
