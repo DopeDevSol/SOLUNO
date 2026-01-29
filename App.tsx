@@ -6,6 +6,7 @@ import UnoCard from './components/UnoCard';
 import { getGameCommentary } from './services/geminiService';
 
 const MAX_TURN_TIME = 15;
+const JOIN_WINDOW_SECONDS = 600; // 10 minutes
 
 const MOCK_LEADERBOARD: LeaderboardEntry[] = [
   { rank: 1, address: "7xV1...9pQz", wins: 142, totalWon: 84.50 },
@@ -21,8 +22,15 @@ const MOCK_RESULTS: GameHistoryEntry[] = [
   { id: "3", winner: "A3sK...8jLp", poolFee: 0.25, prize: 2.25, timeAgo: "12m ago", playersCount: 5 },
 ];
 
-// Generate truly unique Round IDs for the session
-const LOBBY_ROUND_IDS = POOLS.map(() => Math.random().toString(36).substring(2, 10).toUpperCase());
+const INITIAL_POOL_STATES = POOLS.map(() => {
+  const playersJoined = Math.floor(Math.random() * 6) + 1;
+  return {
+    roundId: Math.random().toString(36).substring(2, 10).toUpperCase(),
+    playersJoined,
+    timeLeft: Math.floor(Math.random() * (JOIN_WINDOW_SECONDS - 60)) + 60, 
+    isInGame: playersJoined === 6
+  };
+});
 
 const App: React.FC = () => {
   const [solPrice, setSolPrice] = useState<number | null>(null);
@@ -33,6 +41,7 @@ const App: React.FC = () => {
   const [turnTimeLeft, setTurnTimeLeft] = useState(MAX_TURN_TIME);
   const [walletConnected, setWalletConnected] = useState(false);
   const [scrollPos, setScrollPos] = useState(0);
+  const [poolStates, setPoolStates] = useState(INITIAL_POOL_STATES);
 
   const [gameState, setGameState] = useState<GameState>({
     deck: [], discardPile: [], players: [], currentPlayerIndex: 0, direction: 1,
@@ -40,30 +49,23 @@ const App: React.FC = () => {
   });
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lobbyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrollPos(window.scrollY);
-    };
+    const handleScroll = () => setScrollPos(window.scrollY);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
-    if (view !== 'lobby') return;
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('active');
-        }
-      });
-    }, { threshold: 0.1 });
-
-    const scrollElements = document.querySelectorAll('.scroll-deal');
-    scrollElements.forEach(el => observer.observe(el));
-
-    return () => scrollElements.forEach(el => observer.unobserve(el));
-  }, [view, walletConnected]);
+    lobbyTimerRef.current = setInterval(() => {
+      setPoolStates(prev => prev.map(p => ({
+        ...p,
+        timeLeft: p.timeLeft > 0 ? p.timeLeft - 1 : JOIN_WINDOW_SECONDS
+      })));
+    }, 1000);
+    return () => { if (lobbyTimerRef.current) clearInterval(lobbyTimerRef.current); };
+  }, []);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -77,6 +79,19 @@ const App: React.FC = () => {
     const interval = setInterval(fetchPrice, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (view !== 'lobby') return;
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('active');
+      });
+    }, { threshold: 0.05 });
+
+    const scrollElements = document.querySelectorAll('.scroll-deal');
+    scrollElements.forEach(el => observer.observe(el));
+    return () => scrollElements.forEach(el => observer.unobserve(el));
+  }, [view]);
 
   useEffect(() => {
     if (gameState.status !== 'playing' || gameState.isGameOver) return;
@@ -220,9 +235,10 @@ const App: React.FC = () => {
     });
   };
 
-  const enterPool = (pool: Pool) => {
-    if (!walletConnected && pool.entryFee > 0) {
-      alert("Please connect your Seeker Wallet first!");
+  const enterPool = (pool: Pool, pState: typeof INITIAL_POOL_STATES[0]) => {
+    if (pState.isInGame) return;
+    if (!walletConnected) {
+      setWalletConnected(true);
       return;
     }
     const playerCount = Math.floor(Math.random() * 5) + 2; 
@@ -233,6 +249,12 @@ const App: React.FC = () => {
     setGameState({ deck: [], discardPile: [], players, currentPlayerIndex: 0, direction: 1, isGameOver: false, winner: null, status: 'shuffling', pool, lobbyCountdown: 0 });
     setView('game');
     setTimeout(() => startDealingAnimation(playerCount), 1200);
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   const PlayerSlot: React.FC<{ player: Player; index: number; active: boolean; total: number }> = ({ player, index, active, total }) => {
@@ -249,7 +271,6 @@ const App: React.FC = () => {
         <div className={`mt-1 px-1.5 py-0.5 rounded text-[6px] lg:text-[7px] font-black tracking-tighter ${active ? 'bg-[#14F195] text-black' : 'bg-black/80 text-white/50'}`}>
           {player.name} • {player.hand.length}
         </div>
-        {active && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[6px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">{turnTimeLeft}</div>}
       </div>
     );
   };
@@ -272,40 +293,30 @@ const App: React.FC = () => {
   }, [gameState.players]);
 
   return (
-    <div className="min-h-screen flex flex-col felt-table overflow-y-auto no-scrollbar scroll-smooth">
-      {/* Scroll-Driven Horizontal Flying Cards Background */}
+    <div className="min-h-screen flex flex-col felt-table overflow-y-auto no-scrollbar scroll-smooth relative">
+      {/* Background Card Flight */}
       <div className="fixed inset-0 pointer-events-none z-[5] overflow-hidden">
-        {Array.from({ length: 8 }).map((_, i) => {
-          const speed = 0.5 + (i / 8) * 1.5; // Unique speed for parallax
+        {Array.from({ length: 10 }).map((_, i) => {
+          const speed = 0.5 + (i / 10) * 2.0;
           const colors: CardColor[] = ['red', 'blue', 'green', 'yellow'];
           const values: any[] = ['7', 'skip', 'draw2', '4', 'wild', 'reverse', '9', 'draw4'];
           const isBack = i % 2 === 0;
-          // Calculate horizontal flight: Left to Right based on scroll
-          const xStart = -300 + (i * 100); 
+          const xStart = -300 + (i * 120);
           const currentX = xStart + (scrollPos * speed);
-          const currentY = 10 + (i % 4) * 20;
-          const currentRot = (scrollPos * 0.1) + (i * 45);
-
+          const currentY = 10 + (i % 5) * 18;
+          const currentRot = (scrollPos * 0.1) + (i * 36);
           return (
-            <div key={i} className="absolute opacity-15 filter blur-[0.5px]" style={{
-              left: `${currentX}px`, 
-              top: `${currentY}%`,
-              transform: `rotate(${currentRot}deg)`,
-              transition: 'left 0.1s linear',
-              opacity: Math.max(0, 0.2 - (scrollPos * 0.0001))
+            <div key={i} className="absolute opacity-15 filter blur-[1px]" style={{
+              left: `${currentX}px`, top: `${currentY}%`,
+              transform: `rotate(${currentRot}deg)`, transition: 'left 0.1s linear',
             }}>
-              <UnoCard 
-                card={{ id: `bg-${i}`, color: colors[i % 4], value: values[i % 8] }} 
-                size="md" 
-                isBack={isBack}
-                disabled 
-              />
+              <UnoCard card={{ id: `bg-${i}`, color: colors[i % 4], value: values[i % 8] }} size="md" isBack={isBack} disabled />
             </div>
           );
         })}
       </div>
 
-      <nav className="flex-none px-4 py-2 flex justify-between items-center bg-black/80 backdrop-blur-3xl z-[150] border-b border-white/5 sticky top-0 shadow-xl">
+      <nav className="flex-none px-4 py-2 flex justify-between items-center bg-black/90 backdrop-blur-3xl z-[150] border-b border-white/5 sticky top-0 shadow-xl">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 bg-gradient-to-br from-[#9945FF] to-[#14F195] rounded-md flex items-center justify-center text-white font-black text-[10px]">S</div>
           <h1 className="text-[10px] font-black italic text-white tracking-tighter uppercase">SOLUNO</h1>
@@ -324,77 +335,76 @@ const App: React.FC = () => {
 
       <main className="flex-1 relative z-10">
         {view === 'lobby' && (
-          <div className="min-h-full flex flex-col items-center gap-8 p-4 py-10 lg:py-20 overflow-visible">
-             <div className="text-center sticky top-20 z-20 pointer-events-none transition-transform duration-300" 
-                  style={{ transform: `scale(${Math.max(0.7, 1 - scrollPos/1000)}) translateY(${-scrollPos * 0.08}px)` }}>
-                <h2 className="text-5xl lg:text-9xl font-black italic tracking-tighter text-white drop-shadow-2xl uppercase select-none text-shadow-glow leading-none">SOLUNO</h2>
-                <div className="mt-3 text-[#9945FF] text-[10px] lg:text-[18px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA UNO VERSION - SEEKER EXCLUSIVE</div>
-                
-                {/* Floating visual cards beside title */}
-                <div className="absolute -top-12 -left-20 rotate-[-15deg] hidden lg:block opacity-60">
-                  <UnoCard card={{ id: 'hero-1', color: 'red', value: 'draw4' }} size="lg" disabled />
-                </div>
-                <div className="absolute -top-12 -right-20 rotate-[15deg] hidden lg:block opacity-60">
-                  <UnoCard card={{ id: 'hero-2', color: 'blue', value: 'wild' }} size="lg" isBack disabled />
-                </div>
+          <div className="min-h-full flex flex-col items-center gap-8 p-4 py-4 lg:py-10 overflow-visible">
+             <div className="text-center transition-transform duration-300 pointer-events-none" 
+                  style={{ transform: `scale(${Math.max(0.6, 1 - scrollPos/1200)}) translateY(${-scrollPos * 0.05}px)` }}>
+                <h2 className="text-3xl lg:text-8xl font-black italic tracking-tighter text-white drop-shadow-2xl uppercase select-none text-shadow-glow leading-none">SOLUNO</h2>
+                <div className="mt-2 text-[#9945FF] text-[7px] lg:text-[14px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA UNO VERSION - SEEKER EXCLUSIVE</div>
              </div>
              
-             <div className="w-full flex flex-col items-center gap-8 relative z-30">
-               {!walletConnected ? (
-                  <div className="text-center bg-black/60 p-6 rounded-[2rem] border border-white/5 backdrop-blur-3xl shadow-2xl scroll-deal max-w-sm w-full">
-                     <p className="text-white/40 text-[9px] font-bold uppercase tracking-widest mb-4">Authorize Seed Vault</p>
-                     <button onClick={() => setWalletConnected(true)} className="bg-white text-black px-8 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-transform hover:scale-105">LINK SEEKER</button>
-                  </div>
-               ) : (
-                 <div className="flex flex-col items-center gap-8 w-full max-w-5xl">
-                    <div className="flex flex-col items-center gap-4 w-full">
-                       <span className="text-white/20 text-[7px] font-black tracking-[0.3em] uppercase">VERIFIABLE ON-CHAIN (SOLSCAN)</span>
-                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 w-full px-2 lg:px-6">
-                        {POOLS.map((p, idx) => (
+             <div className="w-full flex flex-col items-center gap-4 relative z-30">
+                 <div className="flex flex-col items-center gap-2 w-full max-w-6xl">
+                    <span className="text-white/20 text-[6px] font-black tracking-[0.3em] uppercase">STAKE YOUR SOLANA</span>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 w-full px-1">
+                      {POOLS.map((p, idx) => {
+                        const pState = poolStates[idx];
+                        return (
                           <div key={p.id} className="scroll-deal" style={{ transitionDelay: `${idx * 40}ms` }}>
                             <button 
-                              onClick={() => enterPool(p)} 
-                              className="w-full bg-black/95 border border-white/5 p-4 lg:p-6 rounded-2xl flex flex-col items-center hover:border-[#14F195] hover:scale-105 transition-all group active:scale-95 shadow-lg relative overflow-hidden neon-card"
+                              onClick={() => enterPool(p, pState)} 
+                              className={`w-full border p-2 lg:p-3 rounded-xl flex flex-col items-center transition-all group shadow-xl relative overflow-hidden neon-card min-h-[110px] lg:min-h-[150px] ${pState.isInGame ? 'bg-red-950/80 border-red-500/50 grayscale-[10%]' : 'bg-black/95 border-white/5 hover:border-[#14F195] hover:scale-105 active:scale-95'}`}
                             >
-                              <div className="absolute top-0 right-0 px-2 py-0.5 bg-[#14F195]/10 rounded-bl-lg flex items-center justify-center">
-                                <span className="text-[5px] font-black text-[#14F195] uppercase tracking-tighter">LIVE</span>
+                              <div className={`absolute top-0 right-0 px-1.5 py-0.5 rounded-bl-lg flex items-center justify-center ${pState.isInGame ? 'bg-red-600' : 'bg-[#14F195]/10'}`}>
+                                <span className={`text-[4px] lg:text-[5px] font-black uppercase tracking-tighter ${pState.isInGame ? 'text-white' : 'text-[#14F195]'}`}>
+                                  {pState.isInGame ? 'FULL' : 'OPEN'}
+                                </span>
                               </div>
-                              <span className="text-3xl font-black text-[#14F195] italic leading-none">{p.entryFee > 0 ? p.entryFee : 'FREE'}</span>
-                              <span className="text-[6px] text-white/40 mt-1 uppercase tracking-widest font-bold">{p.entryFee > 0 ? 'SOL ENTRY' : 'FOR DEGENS'}</span>
-                              <div className="mt-3 flex flex-col items-center gap-0.5">
-                                 <span className="text-[7px] text-[#9945FF] font-black italic uppercase">Round #{LOBBY_ROUND_IDS[idx]}</span>
-                                 <span className="text-[6px] text-white/20 font-bold uppercase tracking-widest">{Math.floor(Math.random() * 5) + 2}/6 Playing</span>
+                              
+                              <span className={`text-xl lg:text-2xl font-black italic leading-none mb-0.5 mt-2 ${pState.isInGame ? 'text-red-500' : 'text-[#14F195]'}`}>
+                                {pState.isInGame ? 'IN GAME' : (p.entryFee > 0 ? p.entryFee : 'FREE')}
+                              </span>
+                              <span className="text-[5px] text-white/30 uppercase tracking-widest font-bold mb-3">
+                                {pState.isInGame ? 'LOCKED' : (p.entryFee > 0 ? 'SOL BET' : 'PRACTICE')}
+                              </span>
+
+                              <div className="mt-auto pt-2 flex flex-col items-center gap-1.5 w-full border-t border-white/5">
+                                 <div className="flex justify-between items-center w-full px-1">
+                                    <div className={`w-7 h-7 lg:w-9 lg:h-9 flex flex-col items-center justify-center rounded-md border ${pState.isInGame ? 'bg-red-900/30 border-red-500/30' : 'bg-[#9945FF]/20 border-[#9945FF]/40'}`}>
+                                      <span className="text-[4px] text-white/40 font-bold uppercase leading-none mb-0.5">Players</span>
+                                      <span className={`text-[8px] lg:text-[10px] font-black ${pState.isInGame ? 'text-red-400' : 'text-white'}`}>{pState.playersJoined}/6</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                      <span className="text-[4px] text-white/20 font-bold uppercase tracking-widest">Window</span>
+                                      <span className={`text-[7px] lg:text-[8px] font-black ${pState.isInGame ? 'text-white/10' : 'text-[#14F195]'}`}>
+                                        {pState.isInGame ? 'BUSY' : formatTime(pState.timeLeft)}
+                                      </span>
+                                    </div>
+                                 </div>
                               </div>
-                              <div className="mt-2 text-[5px] text-white/10 font-mono lowercase truncate w-full text-center">solscan.io/tx/uno_{LOBBY_ROUND_IDS[idx].toLowerCase()}</div>
                             </button>
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
-                    
-                    <div className="flex flex-wrap justify-center gap-3 px-4 pb-4">
-                      <button onClick={() => setView('leaderboard')} className="bg-black/60 border border-white/5 px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all shadow-md scroll-deal">
-                        <span className="text-[8px] font-black text-white/50 tracking-[0.1em] uppercase">Soluno Degens</span>
-                        <div className="w-5 h-5 bg-gradient-to-r from-[#9945FF] to-[#14F195] rounded-full flex items-center justify-center text-[9px]">🏆</div>
+
+                    <div className="flex flex-wrap justify-center gap-2 px-4 pt-4">
+                      <button onClick={() => setView('leaderboard')} className="bg-black/40 border border-white/5 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all shadow-md scroll-deal">
+                        <span className="text-[7px] font-black text-white/40 tracking-[0.1em] uppercase">Soluno Degens</span>
+                        <div className="w-4 h-4 bg-[#9945FF]/20 rounded-full flex items-center justify-center text-[7px] border border-[#9945FF]/40">🏆</div>
                       </button>
-                      <button onClick={() => setView('results')} className="bg-black/60 border border-white/5 px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all shadow-md scroll-deal">
-                        <span className="text-[8px] font-black text-white/50 tracking-[0.1em] uppercase">Game Results</span>
-                        <div className="w-5 h-5 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-[9px]">📡</div>
+                      <button onClick={() => setView('results')} className="bg-black/40 border border-white/5 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all shadow-md scroll-deal">
+                        <span className="text-[7px] font-black text-white/40 tracking-[0.1em] uppercase">Game Results</span>
+                        <div className="w-4 h-4 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-[7px]">📡</div>
                       </button>
                     </div>
                  </div>
-               )}
-             </div>
-
-             <div className="mt-4 py-4 text-center opacity-15 border-t border-white/5 w-full max-w-xs">
-               <p className="text-[7px] font-black tracking-[0.6em] uppercase text-white/60">Verifiable on Solscan • v2.5</p>
              </div>
           </div>
         )}
 
         {view === 'leaderboard' && (
           <div className="min-h-full w-full flex flex-col items-center justify-center p-4 pb-12 animate-in fade-in zoom-in duration-500">
-            <h2 className="text-3xl font-black italic text-white uppercase mb-6 tracking-tighter">SOLUNO DEGENS</h2>
+            <h2 className="text-2xl font-black italic text-white uppercase mb-6 tracking-tighter">SOLUNO DEGENS</h2>
             <div className="w-full max-w-lg bg-black/60 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
               <div className="grid grid-cols-3 px-6 py-3 border-b border-white/10 bg-white/5">
                 <span className="text-[7px] font-black text-white/20 uppercase">RANK / ADDRESS</span>
@@ -414,13 +424,13 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
-            <button onClick={() => setView('lobby')} className="mt-6 bg-white text-black px-10 py-2.5 rounded-md font-black text-[10px] uppercase tracking-widest">BACK TO LOBBY</button>
+            <button onClick={() => setView('lobby')} className="mt-6 bg-white text-black px-10 py-2.5 rounded-md font-black text-[10px] uppercase tracking-widest">BACK</button>
           </div>
         )}
 
         {view === 'results' && (
           <div className="min-h-full w-full flex flex-col items-center justify-center p-4 pb-12 animate-in slide-in-from-right-10 duration-500">
-            <h2 className="text-3xl font-black italic text-white uppercase mb-6 tracking-tighter">GAME RESULTS</h2>
+            <h2 className="text-2xl font-black italic text-white uppercase mb-6 tracking-tighter">GAME RESULTS</h2>
             <div className="w-full max-w-lg bg-black/60 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
               <div className="grid grid-cols-4 px-6 py-3 border-b border-white/10 bg-white/5">
                 <span className="text-[7px] font-black text-white/20 uppercase">TIME</span>
@@ -439,7 +449,7 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
-            <button onClick={() => setView('lobby')} className="mt-6 bg-white text-black px-10 py-2.5 rounded-md font-black text-[10px] uppercase tracking-widest">BACK TO LOBBY</button>
+            <button onClick={() => setView('lobby')} className="mt-6 bg-white text-black px-10 py-2.5 rounded-md font-black text-[10px] uppercase tracking-widest">BACK</button>
           </div>
         )}
 
@@ -481,14 +491,23 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            <div className="absolute top-[10%] left-1/2 -translate-x-1/2 z-[40] bg-black/90 border border-[#14F195]/20 px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2"><div className="w-1.5 h-1.5 bg-[#14F195] rounded-full animate-pulse"></div><span className="text-[10px] font-black italic text-[#14F195] tracking-tight uppercase">{winningPrize > 0 ? winningPrize.toFixed(1) + ' SOL POT' : 'FOR HONOR'}</span></div>
+            <div className="absolute top-[10%] left-1/2 -translate-x-1/2 z-[40] bg-black/95 border border-[#14F195]/30 px-6 py-2 rounded-2xl shadow-2xl flex flex-col items-center">
+               <div className="flex items-center gap-2 mb-0.5">
+                  <div className="w-1.5 h-1.5 bg-[#14F195] rounded-full animate-pulse"></div>
+                  <span className="text-[12px] font-black italic text-[#14F195] tracking-tight uppercase leading-none">{winningPrize > 0 ? winningPrize.toFixed(2) + ' SOL POT' : 'DEMO MODE'}</span>
+               </div>
+               {gameState.pool && gameState.pool.entryFee > 0 && (
+                 <span className="text-[6px] font-black text-white/30 uppercase tracking-[0.2em]">TABLE STAKE: {gameState.pool.entryFee} SOL</span>
+               )}
+            </div>
+
             {dealingCardTarget && <div className="dealing-card-anim" style={{ '--tx': `${dealingCardTarget.x}vw`, '--ty': `${dealingCardTarget.y}vh` } as any}><div className="w-5 h-8 bg-[#111] border border-white/10 rounded-sm"></div></div>}
             
             <div className="absolute bottom-[-10px] w-full z-[200] flex flex-col items-center hand-tray-bg pt-4 pb-5 overflow-visible">
               <div className="flex justify-between items-center w-full px-6 mb-1.5 pointer-events-none">
                 <button onClick={() => setView('lobby')} className="pointer-events-auto bg-white/5 border border-white/10 px-3 py-1 rounded-full text-[6px] font-black text-white/30 uppercase tracking-widest hover:text-red-500 transition-colors">EXIT</button>
                 <div className={`pointer-events-auto px-6 py-1.5 rounded-full text-[8px] font-black italic border transition-all flex items-center gap-2 uppercase ${gameState.currentPlayerIndex === 0 ? 'bg-[#14F195] border-[#14F195] text-black shadow-glow' : 'bg-black/80 border-white/10 text-white/30'}`}>
-                  <span>{gameState.currentPlayerIndex === 0 ? "★ TURN ★" : `WAITING...`}</span>
+                  <span>{gameState.currentPlayerIndex === 0 ? "★ YOUR TURN ★" : `BOT THINKING...`}</span>
                   <span className={`w-4 h-4 rounded-full flex items-center justify-center border border-current font-bold ${turnTimeLeft < 5 ? 'animate-ping' : ''}`}>{turnTimeLeft}</span>
                 </div>
                 <div className="w-[40px]"></div>
@@ -520,9 +539,8 @@ const App: React.FC = () => {
            <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] shadow-2xl mb-8 flex flex-col items-center">
               <p className="text-[#14F195] font-black text-4xl lg:text-7xl leading-none">{winningPrize > 0 ? winningPrize.toFixed(1) : 'GOAT'}</p>
               <p className="text-[#14F195]/60 text-[10px] font-black mt-2 uppercase">{winningPrize > 0 ? 'SOL CLAIMED' : 'HONOR EARNED'}</p>
-              <div className="mt-4 text-[7px] text-white/20 font-mono tracking-tighter uppercase underline decoration-white/10 decoration-dashed underline-offset-4">solscan.io/tx/results_{Math.random().toString(16).slice(2,10)}</div>
            </div>
-           <button onClick={() => setView('lobby')} className="bg-white text-black px-12 py-3.5 rounded-lg font-black text-xs shadow-2xl uppercase tracking-widest transition-transform hover:scale-105">LOBBY</button>
+           <button onClick={() => setView('lobby')} className="bg-white text-black px-12 py-3.5 rounded-lg font-black text-xs shadow-2xl uppercase tracking-widest transition-transform hover:scale-105">RETURN TO LOBBY</button>
         </div>
       )}
     </div>
