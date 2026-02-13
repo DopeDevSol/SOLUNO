@@ -378,7 +378,7 @@ const App: React.FC = () => {
                           <div key={p.id} className="scroll-deal" style={{ transitionDelay: `${idx * 40}ms` }}>
                             <button 
                               onClick={() => enterPool(p, pState)} 
-                              className={`w-full border rounded-xl flex flex-col transition-all group shadow-2xl relative overflow-hidden min-h-[130px] lg:min-h-[160px] ${pState.isInGame ? 'bg-red-950/40 border-red-500/30 grayscale opacity-80' : 'bg-gradient-to-br from-zinc-900/80 to-black border-white/10 hover:border-[#14F195]/50 hover:from-zinc-800/80 hover:scale-105 backdrop-blur-xl'}`}
+                              className={`w-full border rounded-xl flex flex-col transition-all group shadow-2xl relative overflow-hidden min-h-[140px] lg:min-h-[170px] ${pState.isInGame ? 'bg-red-950/40 border-red-500/30 grayscale opacity-80' : 'bg-gradient-to-br from-zinc-900/80 to-black border-white/10 hover:border-[#14F195]/50 hover:from-zinc-800/80 hover:scale-105 backdrop-blur-xl'}`}
                             >
                               {/* Card Header */}
                               <div className="flex justify-between items-center w-full px-2 py-1.5 border-b border-white/5 bg-white/2">
@@ -396,7 +396,7 @@ const App: React.FC = () => {
                               </div>
                               
                               {/* Main Entry Info */}
-                              <div className="flex flex-col items-center justify-center flex-1 py-3">
+                              <div className="flex flex-col items-center justify-center flex-1 py-1">
                                 <span className={`text-2xl lg:text-4xl font-black italic leading-none mb-1 ${pState.isInGame ? 'text-white/20' : 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]'}`}>
                                   {isFree ? 'FREE' : p.entryFee.toFixed(2)}
                                 </span>
@@ -405,16 +405,16 @@ const App: React.FC = () => {
                                 </span>
                               </div>
 
-                              {/* Countdown display */}
-                              <div className="absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                                <span className={`text-[6px] font-black transition-opacity ${pState.isInGame ? 'opacity-0' : 'text-white/20'}`}>
-                                  STARTS IN: {formatTime(pState.timeLeft)}
+                              {/* Game Start Status - Placed clearly above the Power Bar */}
+                              <div className={`w-full text-center pb-1 transition-opacity ${pState.isInGame ? 'opacity-0' : 'opacity-100'}`}>
+                                <span className="text-[6px] font-black text-[#14F195] uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded-full inline-block">
+                                  GAME STARTING IN: {formatTime(pState.timeLeft)}
                                 </span>
                               </div>
 
                               {/* The Power Bar (Bottom Player Progress + Prize Info) */}
                               <div className="mt-auto w-full">
-                                <div className="h-[20px] lg:h-[24px] bg-black/60 relative overflow-hidden flex items-center border-t border-white/5">
+                                <div className="h-[22px] lg:h-[26px] bg-black/60 relative overflow-hidden flex items-center border-t border-white/5">
                                    {/* Progress Fill */}
                                    <div 
                                       className={`absolute inset-y-0 left-0 transition-all duration-1000 ${pState.isInGame ? 'bg-red-600/30' : 'bg-[#14F195]/30'}`}
@@ -424,7 +424,7 @@ const App: React.FC = () => {
                                    {/* Overlay Content */}
                                    <div className="relative w-full px-2 flex justify-between items-center z-10">
                                       <div className="flex items-center gap-1">
-                                        <span className="text-[6px] font-black text-white/40 uppercase">PLRS:</span>
+                                        <span className="text-[6px] font-black text-white/40 uppercase">DEGENS:</span>
                                         <span className={`text-[8px] font-black ${pState.playersJoined >= 8 ? 'text-red-400' : 'text-[#14F195]'}`}>
                                           {pState.playersJoined}/10
                                         </span>
