@@ -22,10 +22,10 @@ const MOCK_RESULTS: GameHistoryEntry[] = [
   { id: "3", winner: "A3sK...8jLp", poolFee: 0.25, prize: 2.25, timeAgo: "12m ago", playersCount: 9 },
 ];
 
-const INITIAL_POOL_STATES = POOLS.map(() => {
+const INITIAL_POOL_STATES = POOLS.map((_, idx) => {
   const playersJoined = Math.floor(Math.random() * 10) + 1; // 10 max
   return {
-    roundId: Math.random().toString(36).substring(2, 10).toUpperCase(),
+    roundId: (idx + 101).toString(), // Unique sequential round IDs
     playersJoined,
     timeLeft: Math.floor(Math.random() * (JOIN_WINDOW_SECONDS - 60)) + 60, 
     isInGame: playersJoined === 10
@@ -373,20 +373,25 @@ const App: React.FC = () => {
                           <div key={p.id} className="scroll-deal" style={{ transitionDelay: `${idx * 40}ms` }}>
                             <button 
                               onClick={() => enterPool(p, pState)} 
-                              className={`w-full border p-2 lg:p-2 rounded-lg flex flex-col items-center transition-all group shadow-md relative overflow-hidden min-h-[85px] lg:min-h-[110px] ${pState.isInGame ? 'bg-red-950/80 border-red-500/50' : 'bg-gradient-to-br from-zinc-800/40 to-zinc-950/95 border-white/20 hover:border-[#14F195] hover:from-zinc-800/60 hover:scale-105 backdrop-blur-sm'}`}
+                              className={`w-full border p-2 lg:p-2 rounded-lg flex flex-col items-center justify-center transition-all group shadow-md relative overflow-hidden min-h-[110px] lg:min-h-[140px] ${pState.isInGame ? 'bg-red-950/80 border-red-500/50' : 'bg-gradient-to-br from-zinc-800/40 to-zinc-950/95 border-white/20 hover:border-[#14F195] hover:from-zinc-800/60 hover:scale-105 backdrop-blur-sm'}`}
                             >
+                              <div className={`absolute top-0 left-0 px-2 py-1 rounded-br bg-white/5`}>
+                                <span className="text-[5px] lg:text-[6px] font-black uppercase text-white/40">ROUND #{pState.roundId}</span>
+                              </div>
                               <div className={`absolute top-0 right-0 px-1 py-0.5 rounded-bl flex items-center justify-center ${pState.isInGame ? 'bg-red-600' : 'bg-[#14F195]/20'}`}>
                                 <span className="text-[4px] lg:text-[5px] font-black uppercase text-white">{pState.isInGame ? 'BUSY' : 'JOIN'}</span>
                               </div>
                               
-                              <span className={`text-lg lg:text-xl font-black italic leading-none mb-0.5 mt-2 ${pState.isInGame ? 'text-red-500' : 'text-[#14F195] drop-shadow-[0_0_8px_rgba(20,241,149,0.3)]'}`}>
-                                {pState.isInGame ? 'LIVE' : (isFree ? 'FREE GAME' : p.entryFee.toFixed(2))}
-                              </span>
-                              <span className="text-[5px] text-white/40 uppercase tracking-widest font-bold mb-2">
-                                {isFree ? 'DEMO MODE' : 'SOL ENTRY'}
-                              </span>
+                              <div className="flex flex-col items-center justify-center flex-1">
+                                <span className={`text-2xl lg:text-4xl font-black italic leading-none mb-1 ${pState.isInGame ? 'text-red-500' : 'text-[#14F195] drop-shadow-[0_0_12px_rgba(20,241,149,0.5)]'}`}>
+                                  {pState.isInGame ? 'LIVE' : (isFree ? 'FREE GAME' : p.entryFee.toFixed(2))}
+                                </span>
+                                <span className="text-[6px] lg:text-[7px] text-white/50 uppercase tracking-[0.2em] font-black">
+                                  {isFree ? 'DEMO MODE' : 'SOL ENTRY'}
+                                </span>
+                              </div>
 
-                              <div className="mt-auto flex justify-between items-center w-full">
+                              <div className="mt-2 flex justify-between items-center w-full px-1">
                                  <div className={`w-8 h-8 lg:w-9 lg:h-9 flex flex-col items-center justify-center rounded bg-[#9945FF] shadow-[0_0_15px_rgba(153,69,255,0.4)] border border-white/20`}>
                                     <span className="text-[4px] text-white/60 font-black uppercase leading-none">Players</span>
                                     <span className="text-[10px] lg:text-[11px] font-black text-white leading-none">{pState.playersJoined}/10</span>
