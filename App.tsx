@@ -3,10 +3,17 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { POOLS, HOUSE_FEE_PERCENT } from './constants';
 import { Card, GameState, Player, Pool, CardColor, LeaderboardEntry, GameHistoryEntry } from './types';
 import UnoCard from './components/UnoCard';
-import { getGameCommentary } from './services/geminiService';
+import { getGameCommentary, getBotChatResponse } from './services/geminiService';
 
 const MAX_TURN_TIME = 15;
 const JOIN_WINDOW_SECONDS = 300; // 5 minutes max
+
+interface ChatMessage {
+  sender: string;
+  text: string;
+  isBot: boolean;
+  isSystem?: boolean;
+}
 
 const MOCK_LEADERBOARD: LeaderboardEntry[] = [
   { rank: 1, address: "7xV1...9pQz", wins: 142, totalWon: 84.50 },
@@ -44,6 +51,11 @@ const App: React.FC = () => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [pendingWildCard, setPendingWildCard] = useState<Card | null>(null);
   const [commentary, setCommentary] = useState("Seeker session active...");
+  
+  // Chat States
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [gameState, setGameState] = useState<GameState>({
     deck: [], discardPile: [], players: [], currentPlayerIndex: 0, direction: 1,
@@ -52,6 +64,10 @@ const App: React.FC = () => {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lobbyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   useEffect(() => {
     const handleScroll = () => setScrollPos(window.scrollY);
@@ -242,6 +258,21 @@ const App: React.FC = () => {
     drawFromDeckInternal(gameState.currentPlayerIndex);
   };
 
+  const sendChatMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMsg = { sender: "YOU", text: chatInput, isBot: false };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput("");
+
+    // Trigger SOLUNO BOT response
+    setTimeout(async () => {
+        const botText = await getBotChatResponse([...chatMessages, userMsg], userMsg.text);
+        setChatMessages(prev => [...prev, { sender: "SOLUNO BOT", text: botText, isBot: true }]);
+    }, 1000);
+  };
+
   const startDealingAnimation = async (playerCount: number) => {
     const deck = createDeck();
     setGameState(prev => ({ ...prev, deck }));
@@ -263,6 +294,7 @@ const App: React.FC = () => {
       while(top.color === 'wild' || top.value === 'draw4') { newDeck.unshift(top); top = newDeck.pop()!; }
       return { ...prev, status: 'playing', discardPile: [top], deck: newDeck };
     });
+    setChatMessages([{ sender: "SOLUNO BOT", text: "GL Degens! Pot is loaded. Don't be paper hands.", isBot: true }]);
   };
 
   const enterPool = (pool: Pool, pState: typeof INITIAL_POOL_STATES[0]) => {
@@ -278,6 +310,7 @@ const App: React.FC = () => {
     ];
     setGameState({ deck: [], discardPile: [], players, currentPlayerIndex: 0, direction: 1, isGameOver: false, winner: null, status: 'shuffling', pool, lobbyCountdown: 0 });
     setView('game');
+    setChatMessages([]);
     setTimeout(() => startDealingAnimation(playerCount), 1200);
   };
 
@@ -445,6 +478,40 @@ const App: React.FC = () => {
           <div className="w-full h-screen relative overflow-hidden">
             <div className={`direction-ring ${gameState.direction === 1 ? 'spin-cw' : 'spin-ccw'}`} />
             <div className="table-watermark-center"><div className="watermark-text">SOLUNO</div><div className="watermark-text mt-1.5" style={{ fontSize: '1vh' }}>PRO TABLE</div></div>
+            
+            {/* Degen Chat - Mobile Seeker optimized */}
+            <div className="absolute left-4 top-[10%] bottom-[25%] w-[200px] lg:w-[280px] z-[50] flex flex-col pointer-events-none">
+              <div className="flex-1 bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden flex flex-col pointer-events-auto">
+                 <div className="px-3 py-2 bg-black/60 border-b border-white/5 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-[#14F195] rounded-full animate-pulse"></div>
+                    <span className="text-[7px] font-black tracking-widest text-white/60">LIVE DEGEN CHAT</span>
+                 </div>
+                 <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 no-scrollbar">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className={`flex flex-col ${msg.sender === 'YOU' ? 'items-end' : 'items-start'}`}>
+                        <span className={`text-[5px] font-black uppercase tracking-widest mb-0.5 ${msg.isBot ? 'text-[#9945FF]' : (msg.sender === 'YOU' ? 'text-[#14F195]' : 'text-white/40')}`}>
+                          {msg.sender}
+                        </span>
+                        <div className={`px-2 py-1.5 rounded-lg max-w-[90%] ${msg.sender === 'YOU' ? 'bg-[#14F195]/10 border border-[#14F195]/20 text-white' : 'bg-white/5 border border-white/5 text-white/80'}`}>
+                          <p className="text-[9px] font-medium normal-case leading-tight">{msg.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <div ref={chatEndRef} />
+                 </div>
+                 <form onSubmit={sendChatMessage} className="p-2 border-t border-white/5 flex gap-1.5">
+                    <input 
+                      type="text" 
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Type message..." 
+                      className="flex-1 bg-white/5 rounded-lg px-2 py-1.5 text-[9px] text-white focus:outline-none border border-white/10"
+                    />
+                    <button type="submit" className="bg-[#14F195] text-black w-8 rounded-lg flex items-center justify-center text-[10px]">↵</button>
+                 </form>
+              </div>
+            </div>
+
             <div className="absolute top-[4%] right-[2%] z-[60]"><div className="bg-black/95 backdrop-blur-2xl border border-white/10 px-2 py-1 rounded-lg max-w-[120px] shadow-2xl"><p className="text-[7px] font-bold text-[#14F195] leading-tight italic uppercase">"{commentary}"</p></div></div>
             <div className="absolute inset-0 z-10">{gameState.players.map((p, i) => <PlayerSlot key={p.id} player={p} index={i} active={gameState.currentPlayerIndex === i} total={gameState.players.length} />)}</div>
             
@@ -472,15 +539,15 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {/* PRIZE POOL POSITIONED BELOW DECK */}
-            <div className="absolute top-[62%] left-1/2 -translate-x-1/2 z-[40] bg-black/95 border border-[#14F195]/30 px-10 py-4 rounded-3xl shadow-[0_0_60px_rgba(20,241,149,0.3)] flex flex-col items-center">
+            {/* PRIZE POOL POSITIONED JUST ABOVE PLAYER CARDS */}
+            <div className="absolute bottom-[160px] lg:bottom-[220px] left-1/2 -translate-x-1/2 z-[40] bg-black/95 border border-[#14F195]/30 px-8 py-3 rounded-full shadow-[0_0_60px_rgba(20,241,149,0.2)] flex flex-col items-center min-w-[200px]">
                <div className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5 bg-[#14F195] rounded-full animate-pulse shadow-[0_0_10px_#14F195]"></div>
-                  <span className="text-[28px] lg:text-[40px] font-black italic text-[#14F195] tracking-tighter uppercase leading-none drop-shadow-[0_0_15px_rgba(20,241,149,0.5)]">
+                  <div className="w-2 h-2 bg-[#14F195] rounded-full animate-pulse shadow-[0_0_10px_#14F195]"></div>
+                  <span className="text-[20px] lg:text-[32px] font-black italic text-[#14F195] tracking-tighter uppercase leading-none drop-shadow-[0_0_15px_rgba(20,241,149,0.5)]">
                     {winningPrizeValue > 0 ? winningPrizeValue.toFixed(2) + ' SOL' : 'DEMO MODE'}
                   </span>
                </div>
-               <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.4em] mt-2">CURRENT PRIZE POOL</span>
+               <span className="text-[6px] font-black text-white/40 uppercase tracking-[0.3em] mt-1">CURRENT PRIZE POOL</span>
             </div>
 
             {/* Color Selection Modal */}

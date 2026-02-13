@@ -27,9 +27,31 @@ export const getGameCommentary = async (gameStateSummary: string): Promise<strin
     });
     return response.text?.trim() || FALLBACK_HYPE[Math.floor(Math.random() * FALLBACK_HYPE.length)];
   } catch (error) {
-    // Gracefully handle 429 (Quota) and other errors with local fallback
     console.warn("Gemini Quota/Error - Using fallback hype.");
     return FALLBACK_HYPE[Math.floor(Math.random() * FALLBACK_HYPE.length)];
+  }
+};
+
+export const getBotChatResponse = async (chatHistory: {sender: string, text: string}[], lastMessage: string): Promise<string> => {
+  try {
+    const historyString = chatHistory.map(m => `${m.sender}: ${m.text}`).join('\n');
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `You are the SOLUNO BOT, a funny, witty, and slightly degenerate AI host of a high-stakes Solana card game chat. 
+      The players are "Degens" betting real SOL. Roast them, hype the game, or respond to their comments in a funny, short way (max 20 words).
+      Be punchy and use crypto slang (WAGMI, REKT, Paper hands, etc) where appropriate.
+      
+      RECENT CHAT:
+      ${historyString}
+      
+      RESPOND TO THIS SPECIFICALLY: "${lastMessage}"`,
+      config: {
+        temperature: 0.9,
+      }
+    });
+    return response.text?.trim() || "Stop typing and play your cards, anon.";
+  } catch (error) {
+    return "SOLUNO BOT is busy counting the house fee. Play on!";
   }
 };
 
