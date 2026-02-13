@@ -359,9 +359,10 @@ const App: React.FC = () => {
              <div className="text-center transition-transform duration-300 pointer-events-none" 
                   style={{ transform: `scale(${Math.max(0.6, 1 - scrollPos/1200)}) translateY(${-scrollPos * 0.05}px)` }}>
                 <h2 className="text-3xl lg:text-7xl font-black italic tracking-tighter text-white drop-shadow-2xl uppercase leading-none">SOLUNO</h2>
-                <div className="mt-1 text-[#9945FF] text-[6px] lg:text-[12px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA UNO SEEKER VERSION</div>
+                <div className="mt-1 text-[#9945FF] text-[6px] lg:text-[12px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA UNO - SEEKER MOBILE VERSION</div>
                 <div className="mt-4 text-white/40 text-[7px] lg:text-[9px] font-black tracking-[0.15em] uppercase px-4 max-w-sm lg:max-w-none leading-relaxed mx-auto">
-                  Classic UNO vibes, Solana speed, Quick matches, Crypto stakes and Endless flex.
+                  Classic UNO vibes, Solana speed, Quick matches,<br />
+                  Crypto stakes and Endless flex.
                 </div>
              </div>
              
