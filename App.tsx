@@ -36,13 +36,14 @@ const App: React.FC = () => {
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [view, setView] = useState<'lobby' | 'game' | 'leaderboard' | 'results'>('lobby');
   const [activeSpecialId, setActiveSpecialId] = useState<string | null>(null);
-  const [dealingCardTarget, setDealingCardTarget] = useState<{ x: number, y: number } | null>(null);
-  const [commentary, setCommentary] = useState("Seeker session active...");
   const [turnTimeLeft, setTurnTimeLeft] = useState(MAX_TURN_TIME);
   const [walletConnected, setWalletConnected] = useState(false);
   const [scrollPos, setScrollPos] = useState(0);
   const [poolStates, setPoolStates] = useState(INITIAL_POOL_STATES);
   const [showExitWarning, setShowExitWarning] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [pendingWildCard, setPendingWildCard] = useState<Card | null>(null);
+  const [commentary, setCommentary] = useState("Seeker session active...");
 
   const [gameState, setGameState] = useState<GameState>({
     deck: [], discardPile: [], players: [], currentPlayerIndex: 0, direction: 1,
@@ -95,7 +96,7 @@ const App: React.FC = () => {
   }, [view]);
 
   useEffect(() => {
-    if (gameState.status !== 'playing' || gameState.isGameOver) return;
+    if (gameState.status !== 'playing' || gameState.isGameOver || showColorPicker) return;
     if (timerRef.current) clearInterval(timerRef.current);
     setTurnTimeLeft(MAX_TURN_TIME);
     timerRef.current = setInterval(() => {
@@ -105,13 +106,13 @@ const App: React.FC = () => {
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver]);
+  }, [gameState.currentPlayerIndex, gameState.status, gameState.isGameOver, showColorPicker]);
 
   const handleTimeout = useCallback(() => drawFromDeck(), [gameState.currentPlayerIndex]);
 
   useEffect(() => {
     if (gameState.status === 'playing' && gameState.currentPlayerIndex !== 0 && !gameState.isGameOver) {
-      const botDelay = 1000 + Math.random() * 1500;
+      const botDelay = 1500 + Math.random() * 1500;
       const timeout = setTimeout(() => performBotMove(), botDelay);
       return () => clearTimeout(timeout);
     }
@@ -167,6 +168,25 @@ const App: React.FC = () => {
     return newState;
   };
 
+  const handleColorSelection = (color: CardColor) => {
+    if (!pendingWildCard) return;
+    setShowColorPicker(false);
+    
+    let newState = { ...gameState };
+    const topCard = newState.discardPile[newState.discardPile.length - 1];
+    topCard.color = color;
+
+    let skip = false;
+    if (pendingWildCard.value === 'draw4') {
+      newState = drawCards(newState, nextPlayer(newState), 4);
+      skip = true;
+    }
+
+    newState.currentPlayerIndex = nextPlayer(newState, skip);
+    setGameState(newState);
+    setPendingWildCard(null);
+  };
+
   const playCardInternal = (card: Card, playerIdx: number) => {
     const topCard = gameState.discardPile[gameState.discardPile.length - 1];
     const isValid = card.color === 'wild' || card.color === topCard.color || card.value === topCard.value;
@@ -182,12 +202,24 @@ const App: React.FC = () => {
       return;
     }
 
+    // Handle Wild Cards
+    if (card.color === 'wild') {
+      if (playerIdx === 0) {
+        setGameState(newState);
+        setPendingWildCard(card);
+        setShowColorPicker(true);
+        return;
+      } else {
+        const colors: CardColor[] = ['red', 'blue', 'green', 'yellow'];
+        card.color = colors[Math.floor(Math.random() * 4)];
+      }
+    }
+
     let skip = false;
     if (card.value === 'skip') skip = true;
     if (card.value === 'reverse') newState.direction *= -1;
     if (card.value === 'draw2') { newState = drawCards(newState, nextPlayer(newState), 2); skip = true; }
-    if (card.value === 'draw4') { newState = drawCards(newState, nextPlayer(newState), 4); skip = true; card.color = 'red'; }
-    if (card.value === 'wild') card.color = 'blue';
+    if (card.value === 'draw4') { newState = drawCards(newState, nextPlayer(newState), 4); skip = true; }
 
     newState.currentPlayerIndex = nextPlayer(newState, skip);
     setGameState(newState);
@@ -201,12 +233,12 @@ const App: React.FC = () => {
   };
 
   const playCard = (card: Card) => {
-    if (gameState.currentPlayerIndex !== 0 || gameState.status !== 'playing') return;
+    if (gameState.currentPlayerIndex !== 0 || gameState.status !== 'playing' || showColorPicker) return;
     playCardInternal(card, 0);
   };
 
   const drawFromDeck = () => {
-    if (gameState.status !== 'playing') return;
+    if (gameState.status !== 'playing' || showColorPicker) return;
     drawFromDeckInternal(gameState.currentPlayerIndex);
   };
 
@@ -215,8 +247,6 @@ const App: React.FC = () => {
     setGameState(prev => ({ ...prev, deck }));
     for (let round = 0; round < 7; round++) {
       for (let pIdx = 0; pIdx < playerCount; pIdx++) {
-        const angle = 90 + (pIdx * (360 / playerCount));
-        setDealingCardTarget({ x: 42 * Math.cos((angle * Math.PI) / 180), y: 32 * Math.sin((angle * Math.PI) / 180) });
         await new Promise(r => setTimeout(r, 40));
         setGameState(prev => {
           const players = [...prev.players];
@@ -227,7 +257,6 @@ const App: React.FC = () => {
         });
       }
     }
-    setDealingCardTarget(null);
     setGameState(prev => {
       const newDeck = [...prev.deck];
       let top = newDeck.pop()!;
@@ -242,7 +271,7 @@ const App: React.FC = () => {
       setWalletConnected(true);
       return;
     }
-    const playerCount = Math.floor(Math.random() * 9) + 2; // Up to 10
+    const playerCount = Math.floor(Math.random() * 8) + 2; // Up to 10
     const players: Player[] = [
       { id: 'me', name: 'YOU', hand: [], isLocal: true, avatarSeed: 88 },
       ...Array.from({ length: playerCount - 1 }).map((_, i) => ({ id: `b-${i}`, name: `BOT ${i+1}`, hand: [], isLocal: false, avatarSeed: Math.random() * 1000 }))
@@ -289,7 +318,7 @@ const App: React.FC = () => {
     );
   };
 
-  const winningPrize = useMemo(() => {
+  const winningPrizeValue = useMemo(() => {
     if (!gameState.pool) return 0;
     const totalPot = gameState.players.length * gameState.pool.entryFee;
     return totalPot * (1 - HOUSE_FEE_PERCENT);
@@ -319,17 +348,7 @@ const App: React.FC = () => {
           const currentY = 5 + (i % 6) * 16;
           const currentRot = (scrollPos * 0.05) + (i * 45);
           return (
-            <div 
-              key={i} 
-              className="absolute opacity-20 filter blur-[0.5px] animate-float" 
-              style={{ 
-                left: `${currentX}px`, 
-                top: `${currentY}%`, 
-                transform: `rotate(${currentRot}deg)`, 
-                transition: 'left 0.1s linear',
-                animationDelay: `${i * 0.8}s`
-              }}
-            >
+            <div key={i} className="absolute opacity-20 filter blur-[0.5px] animate-float" style={{ left: `${currentX}px`, top: `${currentY}%`, transform: `rotate(${currentRot}deg)`, transition: 'left 0.1s linear', animationDelay: `${i * 0.8}s` }}>
               <UnoCard card={{ id: `bg-${i}`, color: colors[i % 4], value: values[i % 8] }} size="md" isBack={i % 3 === 0} disabled />
             </div>
           );
@@ -356,8 +375,7 @@ const App: React.FC = () => {
       <main className="flex-1 relative z-10">
         {view === 'lobby' && (
           <div className="min-h-full flex flex-col items-center gap-6 p-4 py-4 lg:py-6 overflow-visible text-center">
-             <div className="text-center transition-transform duration-300 pointer-events-none" 
-                  style={{ transform: `scale(${Math.max(0.6, 1 - scrollPos/1200)}) translateY(${-scrollPos * 0.05}px)` }}>
+             <div className="text-center transition-transform duration-300 pointer-events-none" style={{ transform: `scale(${Math.max(0.6, 1 - scrollPos/1200)}) translateY(${-scrollPos * 0.05}px)` }}>
                 <h2 className="text-3xl lg:text-7xl font-black italic tracking-tighter text-white drop-shadow-2xl uppercase leading-none">SOLUNO</h2>
                 <div className="mt-1 text-[#9945FF] text-[6px] lg:text-[12px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA UNO - SEEKER MOBILE VERSION</div>
                 <div className="mt-4 text-white/40 text-[7px] lg:text-[9px] font-black tracking-[0.15em] uppercase px-4 max-w-sm lg:max-w-none leading-relaxed mx-auto">
@@ -365,7 +383,6 @@ const App: React.FC = () => {
                   Crypto stakes and Endless flex.
                 </div>
              </div>
-             
              <div className="w-full flex flex-col items-center gap-4 relative z-30">
                  <div className="flex flex-col items-center gap-2 w-full max-w-6xl">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 w-full px-1 mt-2">
@@ -373,67 +390,33 @@ const App: React.FC = () => {
                         const pState = poolStates[idx];
                         const isFree = p.entryFee === 0;
                         const maxPrize = isFree ? 0 : (10 * p.entryFee) * (1 - HOUSE_FEE_PERCENT);
-                        
                         return (
                           <div key={p.id} className="scroll-deal" style={{ transitionDelay: `${idx * 40}ms` }}>
-                            <button 
-                              onClick={() => enterPool(p, pState)} 
-                              className={`w-full border rounded-xl flex flex-col transition-all group shadow-2xl relative overflow-hidden min-h-[140px] lg:min-h-[170px] ${pState.isInGame ? 'bg-red-950/40 border-red-500/30 grayscale opacity-80' : 'bg-gradient-to-br from-zinc-900/80 to-black border-white/10 hover:border-[#14F195]/50 hover:from-zinc-800/80 hover:scale-105 backdrop-blur-xl'}`}
-                            >
-                              {/* Card Header */}
+                            <button onClick={() => enterPool(p, pState)} className={`w-full border rounded-xl flex flex-col transition-all group shadow-2xl relative overflow-hidden min-h-[140px] lg:min-h-[170px] ${pState.isInGame ? 'bg-red-950/40 border-red-500/30 grayscale opacity-80' : 'bg-gradient-to-br from-zinc-900/80 to-black border-white/10 hover:border-[#14F195]/50 hover:from-zinc-800/80 hover:scale-105 backdrop-blur-xl'}`}>
                               <div className="flex justify-between items-center w-full px-2 py-1.5 border-b border-white/5 bg-white/2">
                                 <span className="text-[5px] lg:text-[6px] font-black uppercase text-white/30 tracking-widest">RND #{pState.roundId}</span>
                                 <div className={`px-1.5 py-0.5 rounded flex items-center gap-1 ${pState.isInGame ? 'bg-red-600' : 'bg-[#14F195]/10 border border-[#14F195]/20'}`}>
-                                  {pState.isInGame ? (
-                                    <span className="text-[4px] lg:text-[5px] font-black uppercase text-white">BUSY</span>
-                                  ) : (
-                                    <>
-                                      <div className="w-1 h-1 bg-[#14F195] rounded-full animate-pulse"></div>
-                                      <span className="text-[4px] lg:text-[5px] font-black uppercase text-[#14F195]">JOIN</span>
-                                    </>
-                                  )}
+                                  {pState.isInGame ? <span className="text-[4px] lg:text-[5px] font-black uppercase text-white">BUSY</span> : <><div className="w-1 h-1 bg-[#14F195] rounded-full animate-pulse"></div><span className="text-[4px] lg:text-[5px] font-black uppercase text-[#14F195]">JOIN</span></>}
                                 </div>
                               </div>
-                              
-                              {/* Main Entry Info */}
                               <div className="flex flex-col items-center justify-center flex-1 py-1">
-                                <span className={`text-2xl lg:text-4xl font-black italic leading-none mb-1 ${pState.isInGame ? 'text-white/20' : 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]'}`}>
-                                  {isFree ? 'FREE' : p.entryFee.toFixed(2)}
-                                </span>
-                                <span className={`text-[6px] lg:text-[7px] uppercase tracking-[0.2em] font-black ${pState.isInGame ? 'text-white/10' : 'text-[#9945FF]'}`}>
-                                  {isFree ? 'DEMO MODE' : 'SOL ENTRY'}
-                                </span>
+                                <span className={`text-2xl lg:text-4xl font-black italic leading-none mb-1 ${pState.isInGame ? 'text-white/20' : 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]'}`}>{isFree ? 'FREE' : p.entryFee.toFixed(2)}</span>
+                                <span className={`text-[6px] lg:text-[7px] uppercase tracking-[0.2em] font-black ${pState.isInGame ? 'text-white/10' : 'text-[#9945FF]'}`}>{isFree ? 'DEMO MODE' : 'SOL ENTRY'}</span>
                               </div>
-
-                              {/* Game Start Status - Placed clearly above the Power Bar */}
                               <div className={`w-full text-center pb-1 transition-opacity ${pState.isInGame ? 'opacity-0' : 'opacity-100'}`}>
-                                <span className="text-[6px] font-black text-[#14F195] uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded-full inline-block">
-                                  GAME STARTING IN: {formatTime(pState.timeLeft)}
-                                </span>
+                                <span className="text-[6px] font-black text-[#14F195] uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded-full inline-block">GAME STARTING IN: {formatTime(pState.timeLeft)}</span>
                               </div>
-
-                              {/* The Power Bar (Bottom Player Progress + Prize Info) */}
                               <div className="mt-auto w-full">
                                 <div className="h-[22px] lg:h-[26px] bg-black/60 relative overflow-hidden flex items-center border-t border-white/5">
-                                   {/* Progress Fill */}
-                                   <div 
-                                      className={`absolute inset-y-0 left-0 transition-all duration-1000 ${pState.isInGame ? 'bg-red-600/30' : 'bg-[#14F195]/30'}`}
-                                      style={{ width: `${(pState.playersJoined / 10) * 100}%` }}
-                                   />
-                                   
-                                   {/* Overlay Content */}
+                                   <div className={`absolute inset-y-0 left-0 transition-all duration-1000 ${pState.isInGame ? 'bg-red-600/30' : 'bg-[#14F195]/30'}`} style={{ width: `${(pState.playersJoined / 10) * 100}%` }} />
                                    <div className="relative w-full px-2 flex justify-between items-center z-10">
                                       <div className="flex items-center gap-1">
                                         <span className="text-[6px] font-black text-white/40 uppercase">DEGENS:</span>
-                                        <span className={`text-[8px] font-black ${pState.playersJoined >= 8 ? 'text-red-400' : 'text-[#14F195]'}`}>
-                                          {pState.playersJoined}/10
-                                        </span>
+                                        <span className={`text-[8px] font-black ${pState.playersJoined >= 8 ? 'text-red-400' : 'text-[#14F195]'}`}>{pState.playersJoined}/10</span>
                                       </div>
                                       <div className="flex items-center gap-1">
                                         <span className="text-[5px] font-black text-white/40 uppercase">POT:</span>
-                                        <span className="text-[8px] font-black text-[#14F195] italic">
-                                          {isFree ? '0.00' : maxPrize.toFixed(2)} SOL
-                                        </span>
+                                        <span className="text-[8px] font-black text-[#14F195] italic">{isFree ? '0.00' : maxPrize.toFixed(2)} SOL</span>
                                       </div>
                                    </div>
                                 </div>
@@ -443,7 +426,6 @@ const App: React.FC = () => {
                         );
                       })}
                     </div>
-
                     <div className="flex flex-wrap justify-center gap-2 px-4 pt-4">
                       <button onClick={() => setView('leaderboard')} className="bg-white/5 backdrop-blur-sm border border-white/10 px-4 py-1.5 rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all shadow-md scroll-deal">
                         <span className="text-[7px] font-black text-white/50 tracking-[0.1em] uppercase">Leaderboard</span>
@@ -490,20 +472,38 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            <div className="absolute top-[10%] left-1/2 -translate-x-1/2 z-[40] bg-black/95 border border-[#14F195]/30 px-10 py-4 rounded-3xl shadow-[0_0_60px_rgba(20,241,149,0.3)] flex flex-col items-center">
+            {/* PRIZE POOL POSITIONED BELOW DECK */}
+            <div className="absolute top-[62%] left-1/2 -translate-x-1/2 z-[40] bg-black/95 border border-[#14F195]/30 px-10 py-4 rounded-3xl shadow-[0_0_60px_rgba(20,241,149,0.3)] flex flex-col items-center">
                <div className="flex items-center gap-3">
                   <div className="w-2.5 h-2.5 bg-[#14F195] rounded-full animate-pulse shadow-[0_0_10px_#14F195]"></div>
                   <span className="text-[28px] lg:text-[40px] font-black italic text-[#14F195] tracking-tighter uppercase leading-none drop-shadow-[0_0_15px_rgba(20,241,149,0.5)]">
-                    {winningPrize > 0 ? winningPrize.toFixed(2) + ' SOL' : 'DEMO MODE'}
+                    {winningPrizeValue > 0 ? winningPrizeValue.toFixed(2) + ' SOL' : 'DEMO MODE'}
                   </span>
                </div>
                <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.4em] mt-2">CURRENT PRIZE POOL</span>
-               {gameState.pool && (
-                 <div className="mt-3 px-4 py-1.5 bg-white/5 rounded-full border border-white/5 backdrop-blur-sm">
-                   <span className="text-[7px] font-bold text-white/50 uppercase tracking-widest">TABLE STAKE: {gameState.pool.entryFee === 0 ? 'FREE' : gameState.pool.entryFee.toFixed(2) + ' SOL'}</span>
-                 </div>
-               )}
             </div>
+
+            {/* Color Selection Modal */}
+            {showColorPicker && (
+              <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+                <div className="flex flex-col items-center">
+                  <h3 className="text-xl font-black text-white italic uppercase tracking-[0.3em] mb-8">PICK THE NEXT COLOR</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {['red', 'blue', 'green', 'yellow'].map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => handleColorSelection(color as CardColor)}
+                        className={`w-24 h-24 lg:w-32 lg:h-32 rounded-2xl border-4 border-white/20 transition-all hover:scale-110 active:scale-95 shadow-2xl`}
+                        style={{ 
+                          backgroundColor: color === 'red' ? '#ed1c24' : color === 'blue' ? '#0054a6' : color === 'green' ? '#39b54a' : '#fcee21',
+                          boxShadow: `0 0 40px ${color === 'red' ? 'rgba(237,28,36,0.4)' : color === 'blue' ? 'rgba(0,84,166,0.4)' : color === 'green' ? 'rgba(57,181,74,0.4)' : 'rgba(252,238,33,0.4)'}`
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="absolute bottom-[-10px] w-full z-[200] flex flex-col items-center hand-tray-bg pt-4 pb-5 overflow-visible">
               <div className="flex justify-between items-center w-full px-6 mb-1.5 pointer-events-none">
@@ -524,7 +524,7 @@ const App: React.FC = () => {
                   const yShift = Math.abs(offset) * 1.1;
                   return (
                     <div key={c.id} className="absolute transition-all duration-300 hover:-translate-y-12 transform-gpu" style={{ zIndex: 10 + idx, transform: `translateX(${xShift}px) translateY(${yShift}px) rotate(${rotation}deg)`, transformOrigin: 'bottom center' }}>
-                      <UnoCard card={c} size="md" onClick={() => playCard(c)} disabled={gameState.currentPlayerIndex !== 0} />
+                      <UnoCard card={c} size="md" onClick={() => playCard(c)} disabled={gameState.currentPlayerIndex !== 0 || showColorPicker} />
                     </div>
                   );
                 })}
@@ -535,33 +535,15 @@ const App: React.FC = () => {
 
         {(view === 'leaderboard' || view === 'results') && (
           <div className="min-h-full w-full flex flex-col items-center justify-center p-4 animate-in fade-in duration-500 text-center">
-            <h2 className="text-2xl font-black italic text-white uppercase mb-6 tracking-tighter">
-              {view === 'leaderboard' ? 'DEGEN LEADERBOARD' : 'GAME HISTORY'}
-            </h2>
+            <h2 className="text-2xl font-black italic text-white uppercase mb-6 tracking-tighter">{view === 'leaderboard' ? 'DEGEN LEADERBOARD' : 'GAME HISTORY'}</h2>
             <div className="w-full max-w-lg bg-black/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
               <div className={`grid ${view === 'leaderboard' ? 'grid-cols-3' : 'grid-cols-4'} px-6 py-3 border-b border-white/10 bg-white/5`}>
-                {view === 'leaderboard' ? (
-                  <>
-                    <span className="text-[7px] font-black text-white/20 uppercase">RANK / ADDRESS</span>
-                    <span className="text-[7px] font-black text-white/20 uppercase text-center">WINS</span>
-                    <span className="text-[7px] font-black text-white/20 uppercase text-right">WON</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[7px] font-black text-white/20 uppercase">TIME</span>
-                    <span className="text-[7px] font-black text-white/20 uppercase">WINNER</span>
-                    <span className="text-[7px] font-black text-white/20 uppercase text-center">STAKE</span>
-                    <span className="text-[7px] font-black text-white/20 uppercase text-right">PRIZE</span>
-                  </>
-                )}
+                {view === 'leaderboard' ? (<><span className="text-[7px] font-black text-white/20 uppercase">RANK / ADDRESS</span><span className="text-[7px] font-black text-white/20 uppercase text-center">WINS</span><span className="text-[7px] font-black text-white/20 uppercase text-right">WON</span></>) : (<><span className="text-[7px] font-black text-white/20 uppercase">TIME</span><span className="text-[7px] font-black text-white/20 uppercase">WINNER</span><span className="text-[7px] font-black text-white/20 uppercase text-center">STAKE</span><span className="text-[7px] font-black text-white/20 uppercase text-right">PRIZE</span></>)}
               </div>
               <div className="max-h-[40vh] overflow-y-auto no-scrollbar">
                 {view === 'leaderboard' ? MOCK_LEADERBOARD.map((entry) => (
                   <div key={entry.address} className="grid grid-cols-3 px-6 py-4 border-b border-white/5 items-center hover:bg-white/5">
-                    <div className="flex items-center gap-2 truncate">
-                       <span className={`text-sm font-black italic ${entry.rank <= 3 ? 'text-[#14F195]' : 'text-white/20'}`}>#{entry.rank}</span>
-                       <span className="font-mono text-[9px] text-white/60 truncate">{entry.address}</span>
-                    </div>
+                    <div className="flex items-center gap-2 truncate"><span className={`text-sm font-black italic ${entry.rank <= 3 ? 'text-[#14F195]' : 'text-white/20'}`}>#{entry.rank}</span><span className="font-mono text-[9px] text-white/60 truncate">{entry.address}</span></div>
                     <span className="text-[10px] font-black text-white text-center">{entry.wins}</span>
                     <span className="text-[10px] font-black text-[#14F195] italic text-right">{entry.totalWon.toFixed(1)} SOL</span>
                   </div>
@@ -599,8 +581,8 @@ const App: React.FC = () => {
            <div className="text-[5rem] lg:text-[8rem] mb-3 winner-cup-animation drop-shadow-glow">🏆</div>
            <h3 className="text-3xl lg:text-[5rem] font-black italic tracking-tighter text-white mb-6 uppercase leading-none">{gameState.winner === 'YOU' ? 'VICTORY' : 'DEFEAT'}</h3>
            <div className="bg-white/5 border border-white/10 p-8 rounded-[2rem] shadow-2xl mb-10 flex flex-col items-center min-w-[280px]">
-              <p className="text-[#14F195] font-black text-5xl lg:text-7xl leading-none">{winningPrize > 0 ? winningPrize.toFixed(2) : '---'}</p>
-              <p className="text-[#14F195]/60 text-[10px] font-black mt-3 uppercase tracking-[0.3em]">{winningPrize > 0 ? 'SOL CLAIMED' : 'UNLUCKY DEGEN'}</p>
+              <p className="text-[#14F195] font-black text-5xl lg:text-7xl leading-none">{winningPrizeValue > 0 ? winningPrizeValue.toFixed(2) : '---'}</p>
+              <p className="text-[#14F195]/60 text-[10px] font-black mt-3 uppercase tracking-[0.3em]">{winningPrizeValue > 0 ? 'SOL CLAIMED' : 'UNLUCKY DEGEN'}</p>
            </div>
            <button onClick={() => setView('lobby')} className="bg-white text-black px-16 py-4 rounded-xl font-black text-xs shadow-2xl uppercase tracking-widest transition-transform hover:scale-105 active:scale-95">RETURN TO LOBBY</button>
         </div>
