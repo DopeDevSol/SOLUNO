@@ -372,39 +372,71 @@ const App: React.FC = () => {
                       {POOLS.map((p, idx) => {
                         const pState = poolStates[idx];
                         const isFree = p.entryFee === 0;
+                        const maxPrize = isFree ? 0 : (10 * p.entryFee) * (1 - HOUSE_FEE_PERCENT);
+                        
                         return (
                           <div key={p.id} className="scroll-deal" style={{ transitionDelay: `${idx * 40}ms` }}>
                             <button 
                               onClick={() => enterPool(p, pState)} 
-                              className={`w-full border p-2 lg:p-2 rounded-lg flex flex-col items-center justify-center transition-all group shadow-md relative overflow-hidden min-h-[110px] lg:min-h-[140px] ${pState.isInGame ? 'bg-red-950/80 border-red-500/50' : 'bg-gradient-to-br from-zinc-800/40 to-zinc-950/95 border-white/20 hover:border-[#14F195] hover:from-zinc-800/60 hover:scale-105 backdrop-blur-sm'}`}
+                              className={`w-full border rounded-xl flex flex-col transition-all group shadow-2xl relative overflow-hidden min-h-[130px] lg:min-h-[160px] ${pState.isInGame ? 'bg-red-950/40 border-red-500/30 grayscale opacity-80' : 'bg-gradient-to-br from-zinc-900/80 to-black border-white/10 hover:border-[#14F195]/50 hover:from-zinc-800/80 hover:scale-105 backdrop-blur-xl'}`}
                             >
-                              <div className={`absolute top-0 left-0 px-2 py-1 rounded-br bg-white/5`}>
-                                <span className="text-[5px] lg:text-[6px] font-black uppercase text-white/40">ROUND #{pState.roundId}</span>
-                              </div>
-                              <div className={`absolute top-0 right-0 px-1 py-0.5 rounded-bl flex items-center justify-center ${pState.isInGame ? 'bg-red-600' : 'bg-[#14F195]/20'}`}>
-                                <span className="text-[4px] lg:text-[5px] font-black uppercase text-white">{pState.isInGame ? 'BUSY' : 'JOIN'}</span>
+                              {/* Card Header */}
+                              <div className="flex justify-between items-center w-full px-2 py-1.5 border-b border-white/5 bg-white/2">
+                                <span className="text-[5px] lg:text-[6px] font-black uppercase text-white/30 tracking-widest">RND #{pState.roundId}</span>
+                                <div className={`px-1.5 py-0.5 rounded flex items-center gap-1 ${pState.isInGame ? 'bg-red-600' : 'bg-[#14F195]/10 border border-[#14F195]/20'}`}>
+                                  {pState.isInGame ? (
+                                    <span className="text-[4px] lg:text-[5px] font-black uppercase text-white">BUSY</span>
+                                  ) : (
+                                    <>
+                                      <div className="w-1 h-1 bg-[#14F195] rounded-full animate-pulse"></div>
+                                      <span className="text-[4px] lg:text-[5px] font-black uppercase text-[#14F195]">JOIN</span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                               
-                              <div className="flex flex-col items-center justify-center flex-1">
-                                <span className={`text-2xl lg:text-4xl font-black italic leading-none mb-1 ${pState.isInGame ? 'text-red-500' : 'text-[#14F195] drop-shadow-[0_0_12px_rgba(20,241,149,0.5)]'}`}>
-                                  {pState.isInGame ? 'LIVE' : (isFree ? 'FREE GAME' : p.entryFee.toFixed(2))}
+                              {/* Main Entry Info */}
+                              <div className="flex flex-col items-center justify-center flex-1 py-3">
+                                <span className={`text-2xl lg:text-4xl font-black italic leading-none mb-1 ${pState.isInGame ? 'text-white/20' : 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]'}`}>
+                                  {isFree ? 'FREE' : p.entryFee.toFixed(2)}
                                 </span>
-                                <span className="text-[6px] lg:text-[7px] text-white/50 uppercase tracking-[0.2em] font-black">
+                                <span className={`text-[6px] lg:text-[7px] uppercase tracking-[0.2em] font-black ${pState.isInGame ? 'text-white/10' : 'text-[#9945FF]'}`}>
                                   {isFree ? 'DEMO MODE' : 'SOL ENTRY'}
                                 </span>
                               </div>
 
-                              <div className="mt-2 flex justify-between items-center w-full px-1">
-                                 <div className={`w-8 h-8 lg:w-9 lg:h-9 flex flex-col items-center justify-center rounded bg-[#9945FF] shadow-[0_0_15px_rgba(153,69,255,0.4)] border border-white/20`}>
-                                    <span className="text-[4px] text-white/60 font-black uppercase leading-none">Players</span>
-                                    <span className="text-[10px] lg:text-[11px] font-black text-white leading-none">{pState.playersJoined}/10</span>
-                                 </div>
-                                 <div className="flex flex-col items-end">
-                                    <span className="text-[4px] text-white/30 font-bold uppercase">Game starting in</span>
-                                    <span className={`text-[7px] lg:text-[8px] font-black ${pState.isInGame ? 'text-white/10' : 'text-[#14F195]'}`}>
-                                      {pState.isInGame ? '--:--' : formatTime(pState.timeLeft)}
-                                    </span>
-                                 </div>
+                              {/* Countdown display */}
+                              <div className="absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                                <span className={`text-[6px] font-black transition-opacity ${pState.isInGame ? 'opacity-0' : 'text-white/20'}`}>
+                                  STARTS IN: {formatTime(pState.timeLeft)}
+                                </span>
+                              </div>
+
+                              {/* The Power Bar (Bottom Player Progress + Prize Info) */}
+                              <div className="mt-auto w-full">
+                                <div className="h-[20px] lg:h-[24px] bg-black/60 relative overflow-hidden flex items-center border-t border-white/5">
+                                   {/* Progress Fill */}
+                                   <div 
+                                      className={`absolute inset-y-0 left-0 transition-all duration-1000 ${pState.isInGame ? 'bg-red-600/30' : 'bg-[#14F195]/30'}`}
+                                      style={{ width: `${(pState.playersJoined / 10) * 100}%` }}
+                                   />
+                                   
+                                   {/* Overlay Content */}
+                                   <div className="relative w-full px-2 flex justify-between items-center z-10">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[6px] font-black text-white/40 uppercase">PLRS:</span>
+                                        <span className={`text-[8px] font-black ${pState.playersJoined >= 8 ? 'text-red-400' : 'text-[#14F195]'}`}>
+                                          {pState.playersJoined}/10
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[5px] font-black text-white/40 uppercase">POT:</span>
+                                        <span className="text-[8px] font-black text-[#14F195] italic">
+                                          {isFree ? '0.00' : maxPrize.toFixed(2)} SOL
+                                        </span>
+                                      </div>
+                                   </div>
+                                </div>
                               </div>
                             </button>
                           </div>
@@ -412,7 +444,7 @@ const App: React.FC = () => {
                       })}
                     </div>
 
-                    <div className="flex flex-wrap justify-center gap-2 px-4 pt-1">
+                    <div className="flex flex-wrap justify-center gap-2 px-4 pt-4">
                       <button onClick={() => setView('leaderboard')} className="bg-white/5 backdrop-blur-sm border border-white/10 px-4 py-1.5 rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all shadow-md scroll-deal">
                         <span className="text-[7px] font-black text-white/50 tracking-[0.1em] uppercase">Leaderboard</span>
                         <div className="w-4 h-4 bg-[#9945FF]/20 rounded-full flex items-center justify-center text-[7px] border border-[#9945FF]/40">🏆</div>
