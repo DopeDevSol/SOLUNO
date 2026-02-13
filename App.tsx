@@ -355,17 +355,19 @@ const App: React.FC = () => {
 
       <main className="flex-1 relative z-10">
         {view === 'lobby' && (
-          <div className="min-h-full flex flex-col items-center gap-6 p-4 py-4 lg:py-6 overflow-visible">
+          <div className="min-h-full flex flex-col items-center gap-6 p-4 py-4 lg:py-6 overflow-visible text-center">
              <div className="text-center transition-transform duration-300 pointer-events-none" 
                   style={{ transform: `scale(${Math.max(0.6, 1 - scrollPos/1200)}) translateY(${-scrollPos * 0.05}px)` }}>
                 <h2 className="text-3xl lg:text-7xl font-black italic tracking-tighter text-white drop-shadow-2xl uppercase leading-none">SOLUNO</h2>
-                <div className="mt-1 text-[#9945FF] text-[6px] lg:text-[12px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA MOBILE VERSION</div>
+                <div className="mt-1 text-[#9945FF] text-[6px] lg:text-[12px] font-black tracking-[0.3em] uppercase opacity-90 leading-tight">SOLANA UNO SEEKER VERSION</div>
+                <div className="mt-4 text-white/40 text-[7px] lg:text-[9px] font-black tracking-[0.15em] uppercase px-4 max-w-sm lg:max-w-none leading-relaxed mx-auto">
+                  Classic UNO vibes, Solana speed, Quick matches, Crypto stakes and Endless flex.
+                </div>
              </div>
              
              <div className="w-full flex flex-col items-center gap-4 relative z-30">
                  <div className="flex flex-col items-center gap-2 w-full max-w-6xl">
-                    <span className="text-white/20 text-[6px] font-black tracking-[0.3em] uppercase">STAKE YOUR SOLANA • MAX 10 PLAYERS</span>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 w-full px-1">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 w-full px-1 mt-2">
                       {POOLS.map((p, idx) => {
                         const pState = poolStates[idx];
                         const isFree = p.entryFee === 0;
@@ -499,7 +501,7 @@ const App: React.FC = () => {
         )}
 
         {(view === 'leaderboard' || view === 'results') && (
-          <div className="min-h-full w-full flex flex-col items-center justify-center p-4 animate-in fade-in duration-500">
+          <div className="min-h-full w-full flex flex-col items-center justify-center p-4 animate-in fade-in duration-500 text-center">
             <h2 className="text-2xl font-black italic text-white uppercase mb-6 tracking-tighter">
               {view === 'leaderboard' ? 'DEGEN LEADERBOARD' : 'GAME HISTORY'}
             </h2>
