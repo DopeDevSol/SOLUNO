@@ -400,7 +400,7 @@ const App: React.FC = () => {
                                     <span className="text-[10px] lg:text-[11px] font-black text-white leading-none">{pState.playersJoined}/10</span>
                                  </div>
                                  <div className="flex flex-col items-end">
-                                    <span className="text-[4px] text-white/30 font-bold uppercase">Window</span>
+                                    <span className="text-[4px] text-white/30 font-bold uppercase">Game starting in</span>
                                     <span className={`text-[7px] lg:text-[8px] font-black ${pState.isInGame ? 'text-white/10' : 'text-[#14F195]'}`}>
                                       {pState.isInGame ? '--:--' : formatTime(pState.timeLeft)}
                                     </span>
