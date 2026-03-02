@@ -15,6 +15,7 @@ export interface Player {
   isLocal: boolean;
   avatarSeed: number;
   avatarUrl?: string;
+  hasCalledUno: boolean;
 }
 
 export interface Pool {

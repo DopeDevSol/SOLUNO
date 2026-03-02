@@ -1,7 +1,8 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.GEMINI_API_KEY || "dummy_key";
+const ai = new GoogleGenAI({ apiKey });
 
 const FALLBACK_HYPE = [
   "The table is heating up! Who's holding the Wild?",

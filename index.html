@@ -7,7 +7,6 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>SOLUNO - Solana Mobile</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     body {
@@ -173,23 +172,35 @@
       text-shadow: 0 0 20px rgba(153, 69, 255, 0.5), 0 0 40px rgba(20, 241, 149, 0.3);
     }
   </style>
-<script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0"
-  }
-}
-</script>
+  <script>
+    // Polyfills for Solana wallet adapter
+    window.global = window;
+    window.process = { env: {} };
+    window.Buffer = window.Buffer || [];
+  </script>
+  <script>
+    // Suppress specific benign errors caused by browser extensions or library conflicts
+    window.addEventListener('error', (event) => {
+      if (event.message && (
+        event.message.includes('tronlinkParams') || 
+        event.message.includes('read only property \'fetch\'')
+      )) {
+        event.stopImmediatePropagation();
+      }
+    }, true);
+
+    window.addEventListener('unhandledrejection', (event) => {
+      if (event.reason && event.reason.message && (
+        event.reason.message.includes('tronlinkParams') || 
+        event.reason.message.includes('read only property \'fetch\'')
+      )) {
+        event.stopImmediatePropagation();
+      }
+    });
+  </script>
 </head>
 <body>
-  <div id="rotation-overlay">
-    <div class="w-16 h-16 mb-4 animate-bounce text-4xl">🔄</div>
-    <h2 class="text-xl font-black italic mb-1">LANDSCAPE MODE</h2>
-    <p class="text-white/30 text-[10px] tracking-widest uppercase">Rotate device to join the table</p>
-  </div>
   <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>
